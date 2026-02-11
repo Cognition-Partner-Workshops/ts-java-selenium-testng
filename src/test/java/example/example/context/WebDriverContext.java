@@ -1,43 +1,66 @@
 package example.example.context;
 
-import org.openqa.selenium.WebDriver;
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Playwright;
 
-/**
- * The Class is responsible in maintaining single instance of webdriver in any given thread.
- *
- * @author Bharathish
- */
 public class WebDriverContext {
-	
-	/** The driverinstance. */
-	private static InheritableThreadLocal<WebDriver> driverinstance = new InheritableThreadLocal<>();
 
-	/**
-	 * Gets the driver.
-	 *
-	 * @return the driver
-	 */
-	public static WebDriver getDriver() {
-		if (driverinstance.get() == null)
+	private static InheritableThreadLocal<Page> pageInstance = new InheritableThreadLocal<>();
+	private static InheritableThreadLocal<Browser> browserInstance = new InheritableThreadLocal<>();
+	private static InheritableThreadLocal<BrowserContext> browserContextInstance = new InheritableThreadLocal<>();
+	private static InheritableThreadLocal<Playwright> playwrightInstance = new InheritableThreadLocal<>();
+
+	public static Page getDriver() {
+		if (pageInstance.get() == null)
 			throw new IllegalStateException(
-					"WebDriver has not been set, Please set WebDriver instance by WebDriverContext.setDriver...");
+					"Page has not been set, Please set Page instance by WebDriverContext.setDriver...");
 		else
-			return driverinstance.get();
+			return pageInstance.get();
 	}
 
-	/**
-	 * Sets the driver.
-	 *
-	 * @param driver the new driver
-	 */
-	public static void setDriver(WebDriver driver) {
-		driverinstance.set(driver);
+	public static void setDriver(Page page) {
+		pageInstance.set(page);
 	}
 
-	/**
-	 * Removes the driver.
-	 */
 	public static void removeDriver() {
-		driverinstance.remove();
+		pageInstance.remove();
+	}
+
+	public static Browser getBrowser() {
+		return browserInstance.get();
+	}
+
+	public static void setBrowser(Browser browser) {
+		browserInstance.set(browser);
+	}
+
+	public static void removeBrowser() {
+		browserInstance.remove();
+	}
+
+	public static BrowserContext getBrowserContext() {
+		return browserContextInstance.get();
+	}
+
+	public static void setBrowserContext(BrowserContext context) {
+		browserContextInstance.set(context);
+	}
+
+	public static void removeBrowserContext() {
+		browserContextInstance.remove();
+	}
+
+	public static Playwright getPlaywright() {
+		return playwrightInstance.get();
+	}
+
+	public static void setPlaywright(Playwright playwright) {
+		playwrightInstance.set(playwright);
+	}
+
+	public static void removePlaywright() {
+		playwrightInstance.remove();
 	}
 }

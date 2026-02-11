@@ -1,37 +1,19 @@
 package example.example.pages;
 
-import org.openqa.selenium.Keys;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.FindBy;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
 
-/**
- * The Class represents GooglePage.
- *
- * @author Bharathish
- */
 public class GooglePage extends BasePage {
-	
-	/** The searchinput. */
-	@FindBy(name = "q")
-	private WebElement searchinput;
 
-	/**
-	 * Instantiates a new google page.
-	 *
-	 * @param driver the driver
-	 */
-	public GooglePage(WebDriver driver) {
-		super(driver);
+	public GooglePage(Page page) {
+		super(page);
 	}
 
-	/**
-	 * Searches the given text.
-	 *
-	 * @param key the key
-	 */
 	public void searchText(String key) {
-		searchinput.sendKeys(key + Keys.ENTER);
+		Locator searchInput = page.locator("[name='q']");
+		searchInput.fill(key);
+		searchInput.press("Enter");
+		page.waitForLoadState();
 	}
 
 }

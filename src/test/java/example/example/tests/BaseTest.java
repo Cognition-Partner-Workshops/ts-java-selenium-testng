@@ -1,10 +1,13 @@
 package example.example.tests;
 
-import java.util.concurrent.TimeUnit;
+import java.util.Arrays;
 
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Playwright;
+
 import org.testng.ITestContext;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterSuite;
@@ -18,33 +21,18 @@ import example.example.listeners.ReportListener;
 import example.example.util.LoggerUtil;
 import example.example.util.MailUtil;
 import example.example.util.TestProperties;
-import io.github.bonigarcia.wdm.WebDriverManager;
 
-/**
- * Every test class should extend this calss.
- *
- * @author Bharathish
- */
 @Listeners({ ReportListener.class, LogListener.class })
 public class BaseTest {
 
-	/** The driver. */
-	protected WebDriver driver;
+	protected Page page;
 
-	/**
-	 * Global setup.
-	 */
 	@BeforeSuite(alwaysRun = true)
 	public void globalSetup() {
 		LoggerUtil.log("************************** Test Execution Started ************************************");
 		TestProperties.loadAllPropertie();
 	}
 
-	/**
-	 * Wrap all up.
-	 *
-	 * @param context the context
-	 */
 	@AfterSuite(alwaysRun = true)
 	public void wrapAllUp(ITestContext context) {
 		int total = context.getAllTestMethods().length;
@@ -60,32 +48,43 @@ public class BaseTest {
 		LoggerUtil.log("************************** Test Execution Finished ************************************");
 	}
 
-	/**
-	 * Setup.
-	 */
 	@BeforeClass
 	protected void setup() {
-//		System.setProperty("webdriver.chrome.driver", Constants.CHROME_DRIVER_PATH);
-		WebDriverManager.chromedriver().setup();
-		ChromeOptions ops = new ChromeOptions();
-		ops.addArguments("disable-infobars");
-		ops.addArguments("--headless");
-		ops.addArguments("--no-sandbox");
-		ops.addArguments("--disable-dev-shm-usage");
-		driver = new ChromeDriver(ops);
-		driver.manage().window().maximize();
-		driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
-		WebDriverContext.setDriver(driver);
+		Playwright playwright = Playwright.create();
+		Browser browser = playwright.chromium().launch(
+				new BrowserType.LaunchOptions()
+						.setHeadless(true)
+						.setArgs(Arrays.asList("--no-sandbox", "--disable-dev-shm-usage")));
+		BrowserContext browserContext = browser.newContext(
+				new Browser.NewContextOptions().setViewportSize(1920, 1080));
+		page = browserContext.newPage();
+		page.setDefaultTimeout(10000);
+		WebDriverContext.setPlaywright(playwright);
+		WebDriverContext.setBrowser(browser);
+		WebDriverContext.setBrowserContext(browserContext);
+		WebDriverContext.setDriver(page);
 	}
 
-	/**
-	 * Wrap up.
-	 */
 	@AfterClass
 	public void wrapUp() {
-		if (driver != null) {
-			driver.close();
-			driver.quit();
+		if (page != null) {
+			page.close();
 		}
+		BrowserContext ctx = WebDriverContext.getBrowserContext();
+		if (ctx != null) {
+			ctx.close();
+		}
+		Browser browser = WebDriverContext.getBrowser();
+		if (browser != null) {
+			browser.close();
+		}
+		Playwright pw = WebDriverContext.getPlaywright();
+		if (pw != null) {
+			pw.close();
+		}
+		WebDriverContext.removeDriver();
+		WebDriverContext.removeBrowserContext();
+		WebDriverContext.removeBrowser();
+		WebDriverContext.removePlaywright();
 	}
 }
