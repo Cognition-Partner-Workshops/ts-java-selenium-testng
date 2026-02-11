@@ -6,6 +6,10 @@
 		<classes>
 			<class name="example.example.tests.GoogleSearchTest" />
 			<class name="example.example.tests.FaceBookLoginTest"></class>
+			<class name="example.example.tests.PPLHomePageTest" />
+			<class name="example.example.tests.PPLOutagesPageTest" />
+			<class name="example.example.tests.PPLSearchPageTest" />
+			<class name="example.example.tests.PPLNavigationTest" />
 		</classes>
 	</test> <!-- Test -->
 </suite> <!-- Suite -->
