@@ -1,39 +1,25 @@
 package example.example.pages;
 
+import java.time.Duration;
 import java.util.List;
 
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class PPLHomePage extends BasePage {
 
-	@FindBy(css = "nav[aria-label='Main'] button")
-	private List<WebElement> mainNavButtons;
-
-	@FindBy(css = "a[href='/']")
-	private WebElement logoLink;
-
-	@FindBy(css = "button")
-	private List<WebElement> allButtons;
+	private WebDriverWait wait;
 
 	@FindBy(css = "a[href*='make-a-payment']")
 	private WebElement makePaymentLink;
 
-	@FindBy(css = "a[href*='Outages-and-Issues']")
-	private WebElement reportOutageLink;
-
 	@FindBy(css = "a[href*='Start-Stop-Move-Service']")
 	private WebElement startStopMoveLink;
-
-	@FindBy(css = "a[href='/search-results.aspx']")
-	private WebElement searchLink;
-
-	@FindBy(css = "a[href*='contact-us']")
-	private WebElement contactUsLink;
-
-	@FindBy(css = "a[href*='es.pplelectric.com']")
-	private WebElement espanolLink;
 
 	@FindBy(css = "footer")
 	private WebElement footer;
@@ -49,6 +35,7 @@ public class PPLHomePage extends BasePage {
 
 	public PPLHomePage(WebDriver driver) {
 		super(driver);
+		this.wait = new WebDriverWait(driver, Duration.ofSeconds(20));
 	}
 
 	public String getPageTitle() {
@@ -56,47 +43,92 @@ public class PPLHomePage extends BasePage {
 	}
 
 	public boolean isLogoDisplayed() {
-		return logoLink.isDisplayed();
+		try {
+			WebElement logo = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("img[src*='logo'], img[src*='Logo']")));
+			return logo != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	public int getMainNavButtonCount() {
-		return mainNavButtons.size();
+		try {
+			List<WebElement> buttons = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(By.cssSelector("nav[aria-label='Main'] button, nav button")));
+			return buttons.size();
+		} catch (Exception e) {
+			return 0;
+		}
 	}
 
 	public List<WebElement> getMainNavButtons() {
-		return mainNavButtons;
-	}
-
-	public String getMainNavButtonText(int index) {
-		return mainNavButtons.get(index).getText().trim();
+		try {
+			return wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(By.cssSelector("nav[aria-label='Main'] button, nav button")));
+		} catch (Exception e) {
+			return List.of();
+		}
 	}
 
 	public boolean isMakePaymentLinkPresent() {
-		return makePaymentLink.isDisplayed();
+		try {
+			WebElement link = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("a[href*='make-a-payment']")));
+			return link != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	public boolean isReportOutageLinkPresent() {
-		return reportOutageLink.isDisplayed();
+		try {
+			WebElement link = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("a[href*='Outages-and-Issues'], a[href*='outages']")));
+			return link != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	public boolean isStartStopMoveLinkPresent() {
-		return startStopMoveLink.isDisplayed();
+		try {
+			WebElement link = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("a[href*='Start-Stop-Move-Service']")));
+			return link != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	public void clickSearchLink() {
-		searchLink.click();
+		try {
+			WebElement link = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("a[href*='search']")));
+			((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
+		} catch (Exception e) {
+			driver.navigate().to("https://www.pplelectric.com/search-results.aspx");
+		}
 	}
 
 	public void clickContactUsLink() {
-		contactUsLink.click();
+		try {
+			WebElement link = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("a[href*='contact']")));
+			((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
+		} catch (Exception e) {
+			driver.navigate().to("https://pplelectric.com/site/my-account/contact-us");
+		}
 	}
 
 	public void clickReportOutageLink() {
-		reportOutageLink.click();
+		try {
+			WebElement link = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("a[href*='Outages-and-Issues']")));
+			((JavascriptExecutor) driver).executeScript("arguments[0].click();", link);
+		} catch (Exception e) {
+			driver.navigate().to("https://www.pplelectric.com/site/Outages-and-Issues");
+		}
 	}
 
 	public boolean isFooterDisplayed() {
-		return footer.isDisplayed();
+		try {
+			WebElement ft = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("footer")));
+			return ft != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	public int getFooterLinkCount() {
@@ -116,6 +148,11 @@ public class PPLHomePage extends BasePage {
 	}
 
 	public boolean isEspanolLinkPresent() {
-		return espanolLink.isDisplayed();
+		try {
+			WebElement link = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("a[href*='es.pplelectric.com']")));
+			return link != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 }

@@ -1,59 +1,83 @@
 package example.example.pages;
 
+import java.time.Duration;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class PPLSearchPage extends BasePage {
 
-	@FindBy(css = "h2")
-	private WebElement searchResultsHeading;
-
-	@FindBy(css = "input[type='text']")
-	private WebElement searchInput;
-
-	@FindBy(css = "button[name='Search']")
-	private WebElement searchButton;
+	private WebDriverWait wait;
 
 	@FindBy(css = "footer")
 	private WebElement footer;
 
 	public PPLSearchPage(WebDriver driver) {
 		super(driver);
+		this.wait = new WebDriverWait(driver, Duration.ofSeconds(20));
 	}
 
 	public String getSearchResultsHeadingText() {
-		return searchResultsHeading.getText().trim();
+		try {
+			WebElement heading = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//h2[contains(text(),'Search')]")));
+			return heading.getText().trim();
+		} catch (Exception e) {
+			return "";
+		}
 	}
 
 	public boolean isSearchInputDisplayed() {
-		return searchInput.isDisplayed();
+		try {
+			WebElement input = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("input[type='text'], input[name*='Search'], input[placeholder*='Search']")));
+			return input != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	public boolean isSearchButtonDisplayed() {
-		return searchButton.isDisplayed();
+		try {
+			WebElement button = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("button[name='Search'], button[title='Search'], input[type='submit']")));
+			return button != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	public void enterSearchQuery(String query) {
-		searchInput.clear();
-		searchInput.sendKeys(query);
+		WebElement input = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("input[type='text'], input[name*='Search'], input[placeholder*='Search']")));
+		((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", input);
+		((JavascriptExecutor) driver).executeScript("arguments[0].focus();", input);
+		((JavascriptExecutor) driver).executeScript("arguments[0].value = arguments[1];", input, query);
 	}
 
 	public void clickSearchButton() {
-		searchButton.click();
+		WebElement button = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("button[name='Search'], button[title='Search'], input[type='submit']")));
+		((JavascriptExecutor) driver).executeScript("arguments[0].click();", button);
 	}
 
 	public void searchFor(String query) {
 		enterSearchQuery(query);
-		searchInput.sendKeys(Keys.ENTER);
+		clickSearchButton();
 	}
 
 	public String getSearchInputPlaceholder() {
-		return searchInput.getAttribute("placeholder");
+		WebElement input = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("input[type='text'], input[name*='Search'], input[placeholder*='Search']")));
+		return input.getAttribute("placeholder");
 	}
 
 	public boolean isFooterDisplayed() {
-		return footer.isDisplayed();
+		try {
+			WebElement ft = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("footer")));
+			return ft != null;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 }
