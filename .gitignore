@@ -6,3 +6,19 @@
 logfile.log
 /test-output/
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.pytest_cache/
+htmlcov/
+.coverage
+*.whl
+venv/
+.venv/
+
