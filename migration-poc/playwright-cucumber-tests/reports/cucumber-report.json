@@ -1,0 +1,777 @@
+[
+  {
+    "description": "  As a QA engineer migrating from .NET to Angular\n  I want to verify the Angular app works across all major browsers\n  So that I can ensure cross-browser compatibility after migration",
+    "elements": [
+      {
+        "description": "",
+        "id": "cross-browser-testing---chromium,-firefox,-and-webkit;login-page-renders-correctly-on-chromium",
+        "keyword": "Scenario",
+        "line": 7,
+        "name": "Login page renders correctly on Chromium",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 315826181
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "I launch a \"chromium\" browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 380200129
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 9,
+            "name": "I open the Angular login page on this browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:27"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 629339470
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 10,
+            "name": "the login page should render correctly",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:32"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 73220756
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "I take a screenshot named \"angular-login-chromium\"",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:43"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 279785050
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 66148639
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@cross-browser",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "cross-browser-testing---chromium,-firefox,-and-webkit;login-page-renders-correctly-on-firefox",
+        "keyword": "Scenario",
+        "line": 13,
+        "name": "Login page renders correctly on Firefox",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 269651023
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 14,
+            "name": "I launch a \"firefox\" browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1283537408
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 15,
+            "name": "I open the Angular login page on this browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:27"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 869698262
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 16,
+            "name": "the login page should render correctly",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:32"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 88909923
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 17,
+            "name": "I take a screenshot named \"angular-login-firefox\"",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:43"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 622051437
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 63405116
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@cross-browser",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "cross-browser-testing---chromium,-firefox,-and-webkit;login-page-renders-correctly-on-webkit",
+        "keyword": "Scenario",
+        "line": 19,
+        "name": "Login page renders correctly on WebKit",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 264899116
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 20,
+            "name": "I launch a \"webkit\" browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:11"
+            },
+            "result": {
+              "status": "failed",
+              "duration": 240042730,
+              "error_message": "browserType.launch: \n╔══════════════════════════════════════════════════════╗\n║ Host system is missing dependencies to run browsers. ║\n║ Please install them with the following command:      ║\n║                                                      ║\n║     sudo npx playwright install-deps                 ║\n║                                                      ║\n║ Alternatively, use apt:                              ║\n║     sudo apt-get install libgles2\\                   ║\n║         gstreamer1.0-libav                           ║\n║                                                      ║\n║ <3 Playwright Team                                   ║\n╚══════════════════════════════════════════════════════╝\n    at CustomWorld.<anonymous> (/home/ubuntu/repos/ts-selenium-simple/migration-poc/playwright-cucumber-tests/features/step-definitions/cross-browser.steps.ts:18:35)"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 21,
+            "name": "I open the Angular login page on this browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:27"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 22,
+            "name": "the login page should render correctly",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:32"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 23,
+            "name": "I take a screenshot named \"angular-login-webkit\"",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:43"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 66468264
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@cross-browser",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "cross-browser-testing---chromium,-firefox,-and-webkit;dashboard-works-correctly-on-chromium",
+        "keyword": "Scenario",
+        "line": 25,
+        "name": "Dashboard works correctly on Chromium",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 276941249
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 26,
+            "name": "I launch a \"chromium\" browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 252890900
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 27,
+            "name": "I login and navigate to dashboard on this browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:48"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1571095584
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 28,
+            "name": "the dashboard should display all statistics",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:58"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 28735098
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 29,
+            "name": "I take a screenshot named \"angular-dashboard-chromium\"",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:43"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 131629446
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 63996857
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@cross-browser",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "cross-browser-testing---chromium,-firefox,-and-webkit;dashboard-works-correctly-on-firefox",
+        "keyword": "Scenario",
+        "line": 31,
+        "name": "Dashboard works correctly on Firefox",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 282458595
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 32,
+            "name": "I launch a \"firefox\" browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1177003035
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 33,
+            "name": "I login and navigate to dashboard on this browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:48"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1816511522
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 34,
+            "name": "the dashboard should display all statistics",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:58"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 39789050
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 35,
+            "name": "I take a screenshot named \"angular-dashboard-firefox\"",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:43"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 614743399
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 108739123
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@cross-browser",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "cross-browser-testing---chromium,-firefox,-and-webkit;dashboard-works-correctly-on-webkit",
+        "keyword": "Scenario",
+        "line": 37,
+        "name": "Dashboard works correctly on WebKit",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 274578446
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 38,
+            "name": "I launch a \"webkit\" browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:11"
+            },
+            "result": {
+              "status": "failed",
+              "duration": 198303149,
+              "error_message": "browserType.launch: \n╔══════════════════════════════════════════════════════╗\n║ Host system is missing dependencies to run browsers. ║\n║ Please install them with the following command:      ║\n║                                                      ║\n║     sudo npx playwright install-deps                 ║\n║                                                      ║\n║ Alternatively, use apt:                              ║\n║     sudo apt-get install libgles2\\                   ║\n║         gstreamer1.0-libav                           ║\n║                                                      ║\n║ <3 Playwright Team                                   ║\n╚══════════════════════════════════════════════════════╝\n    at CustomWorld.<anonymous> (/home/ubuntu/repos/ts-selenium-simple/migration-poc/playwright-cucumber-tests/features/step-definitions/cross-browser.steps.ts:18:35)"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 39,
+            "name": "I login and navigate to dashboard on this browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:48"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 40,
+            "name": "the dashboard should display all statistics",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:58"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 41,
+            "name": "I take a screenshot named \"angular-dashboard-webkit\"",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:43"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 62662068
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@cross-browser",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "cross-browser-testing---chromium,-firefox,-and-webkit;employee-crud-works-on-chromium",
+        "keyword": "Scenario",
+        "line": 43,
+        "name": "Employee CRUD works on Chromium",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 283994533
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 44,
+            "name": "I launch a \"chromium\" browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 269805543
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 45,
+            "name": "I perform full CRUD operations on this browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:68"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 5872865643
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 46,
+            "name": "all CRUD operations should complete successfully",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:95"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 16446103
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 47,
+            "name": "I take a screenshot named \"angular-crud-chromium\"",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:43"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 142222634
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 68699377
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@cross-browser",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "cross-browser-testing---chromium,-firefox,-and-webkit;employee-crud-works-on-firefox",
+        "keyword": "Scenario",
+        "line": 49,
+        "name": "Employee CRUD works on Firefox",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 280753437
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 50,
+            "name": "I launch a \"firefox\" browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1248521852
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 51,
+            "name": "I perform full CRUD operations on this browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:68"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 6178861672
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 52,
+            "name": "all CRUD operations should complete successfully",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:95"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 23294801
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 53,
+            "name": "I take a screenshot named \"angular-crud-firefox\"",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:43"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 700053468
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 80578582
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@cross-browser",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "cross-browser-testing---chromium,-firefox,-and-webkit;employee-crud-works-on-webkit",
+        "keyword": "Scenario",
+        "line": 55,
+        "name": "Employee CRUD works on WebKit",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 337202866
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 56,
+            "name": "I launch a \"webkit\" browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:11"
+            },
+            "result": {
+              "status": "failed",
+              "duration": 195357991,
+              "error_message": "browserType.launch: \n╔══════════════════════════════════════════════════════╗\n║ Host system is missing dependencies to run browsers. ║\n║ Please install them with the following command:      ║\n║                                                      ║\n║     sudo npx playwright install-deps                 ║\n║                                                      ║\n║ Alternatively, use apt:                              ║\n║     sudo apt-get install libgles2\\                   ║\n║         gstreamer1.0-libav                           ║\n║                                                      ║\n║ <3 Playwright Team                                   ║\n╚══════════════════════════════════════════════════════╝\n    at CustomWorld.<anonymous> (/home/ubuntu/repos/ts-selenium-simple/migration-poc/playwright-cucumber-tests/features/step-definitions/cross-browser.steps.ts:18:35)"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 57,
+            "name": "I perform full CRUD operations on this browser",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:68"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 58,
+            "name": "all CRUD operations should complete successfully",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:95"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 59,
+            "name": "I take a screenshot named \"angular-crud-webkit\"",
+            "match": {
+              "location": "features/step-definitions/cross-browser.steps.ts:43"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 66554996
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@cross-browser",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "cross-browser-testing---chromium,-firefox,-and-webkit",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "Cross-Browser Testing - Chromium, Firefox, and WebKit",
+    "tags": [
+      {
+        "name": "@cross-browser",
+        "line": 1
+      }
+    ],
+    "uri": "features/08-cross-browser.feature"
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "name": "playwright-cucumber-migration-tests",
+  "version": "1.0.0",
+  "description": "Playwright + Cucumber BDD tests for .NET to Angular migration POC",
+  "scripts": {
+    "test": "cucumber-js --config cucumber.js",
+    "test:legacy": "LEGACY_URL=http://localhost:3000 ANGULAR_URL=http://localhost:4200 cucumber-js --config cucumber.js --tags @legacy",
+    "test:angular": "LEGACY_URL=http://localhost:3000 ANGULAR_URL=http://localhost:4200 cucumber-js --config cucumber.js --tags @angular",
+    "test:visual": "LEGACY_URL=http://localhost:3000 ANGULAR_URL=http://localhost:4200 cucumber-js --config cucumber.js --tags @visual-regression",
+    "test:e2e": "LEGACY_URL=http://localhost:3000 ANGULAR_URL=http://localhost:4200 cucumber-js --config cucumber.js --tags @e2e",
+    "test:api": "LEGACY_URL=http://localhost:3000 ANGULAR_URL=http://localhost:4200 cucumber-js --config cucumber.js --tags @api-contract",
+    "test:migration": "LEGACY_URL=http://localhost:3000 ANGULAR_URL=http://localhost:4200 cucumber-js --config cucumber.js --tags @incremental-migration",
+    "test:all": "LEGACY_URL=http://localhost:3000 ANGULAR_URL=http://localhost:4200 cucumber-js --config cucumber.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cucumber/cucumber": "^10.3.1",
+    "@playwright/test": "^1.41.0",
+    "playwright": "^1.41.0",
+    "pixelmatch": "^5.3.0",
+    "pngjs": "^7.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0"
+  }
+}

@@ -1,0 +1,34 @@
+<nav class="navbar">
+  <a routerLink="/dashboard" class="brand">Employee Management (Angular)</a>
+  <div class="nav-links">
+    <a routerLink="/dashboard" class="active" id="nav-dashboard">Dashboard</a>
+    <a routerLink="/employees" id="nav-employees">Employees</a>
+    <a href="#" (click)="logout()" id="nav-logout">Logout</a>
+  </div>
+</nav>
+<div class="container">
+  <div class="page-header">
+    <h1 id="welcomeMsg">Welcome, {{ username }}</h1>
+  </div>
+  <div class="stats-grid" id="statsGrid" *ngIf="stats">
+    <div class="stat-card" id="statTotalEmployees">
+      <div class="stat-value" id="totalEmployees">{{ stats.totalEmployees }}</div>
+      <div class="stat-label">Total Employees</div>
+    </div>
+    <div class="stat-card green" id="statTotalDepts">
+      <div class="stat-value" id="totalDepartments">{{ stats.totalDepartments }}</div>
+      <div class="stat-label">Departments</div>
+    </div>
+    <div class="stat-card orange" id="statAvgSalary">
+      <div class="stat-value" id="avgSalary">${{ stats.averageSalary | number }}</div>
+      <div class="stat-label">Average Salary</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Recent Activity</h2>
+    <p id="activityInfo">Welcome to the Employee Management System. Use the navigation above to manage employees.</p>
+  </div>
+</div>
+<div class="footer">
+  <p>&copy; 2024 Employee Management System - Angular Application</p>
+</div>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Employee Management System (.NET MVC)</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/dashboard" class="brand">Employee Management (.NET MVC)</a>
+    <div class="nav-links">
+      <a href="/dashboard" class="active" id="nav-dashboard">Dashboard</a>
+      <a href="/employees" id="nav-employees">Employees</a>
+      <a href="#" onclick="logout()" id="nav-logout">Logout</a>
+    </div>
+  </nav>
+  <div class="container">
+    <div class="page-header">
+      <h1 id="welcomeMsg">Dashboard</h1>
+    </div>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card" id="statTotalEmployees">
+        <div class="stat-value" id="totalEmployees">-</div>
+        <div class="stat-label">Total Employees</div>
+      </div>
+      <div class="stat-card green" id="statTotalDepts">
+        <div class="stat-value" id="totalDepartments">-</div>
+        <div class="stat-label">Departments</div>
+      </div>
+      <div class="stat-card orange" id="statAvgSalary">
+        <div class="stat-value" id="avgSalary">-</div>
+        <div class="stat-label">Average Salary</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Recent Activity</h2>
+      <p id="activityInfo">Welcome to the Employee Management System. Use the navigation above to manage employees.</p>
+    </div>
+  </div>
+  <div class="footer">
+    <p>&copy; 2024 Employee Management System - Legacy .NET MVC Application</p>
+  </div>
+  <script>
+    (function() {
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      if (!user) { window.location.href = '/login'; return; }
+      document.getElementById('welcomeMsg').textContent = 'Welcome, ' + user.username;
+      loadStats();
+    })();
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/dashboard/stats');
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('totalEmployees').textContent = data.data.totalEmployees;
+          document.getElementById('totalDepartments').textContent = data.data.totalDepartments;
+          document.getElementById('avgSalary').textContent = '$' + data.data.averageSalary.toLocaleString();
+        }
+      } catch (err) { console.error('Failed to load stats', err); }
+    }
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+  </script>
+</body>
+</html>

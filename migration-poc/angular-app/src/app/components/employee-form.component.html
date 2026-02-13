@@ -1,0 +1,49 @@
+<nav class="navbar">
+  <a routerLink="/dashboard" class="brand">Employee Management (Angular)</a>
+  <div class="nav-links">
+    <a routerLink="/dashboard" id="nav-dashboard">Dashboard</a>
+    <a routerLink="/employees" class="active" id="nav-employees">Employees</a>
+    <a href="#" (click)="logout()" id="nav-logout">Logout</a>
+  </div>
+</nav>
+<div class="container">
+  <div class="page-header">
+    <h1 id="formTitle">{{ editMode ? 'Edit Employee' : 'Add Employee' }}</h1>
+    <a routerLink="/employees" class="btn btn-secondary">Back to List</a>
+  </div>
+  <div class="alert alert-danger" *ngIf="errorMessage" id="errorAlert">{{ errorMessage }}</div>
+  <div class="alert alert-success" *ngIf="successMessage" id="successAlert">{{ successMessage }}</div>
+  <div class="card">
+    <form (ngSubmit)="onSubmit()" id="employeeForm">
+      <div class="form-group">
+        <label for="name">Full Name *</label>
+        <input type="text" id="name" [(ngModel)]="name" name="name" placeholder="Enter full name" required>
+      </div>
+      <div class="form-group">
+        <label for="email">Email Address *</label>
+        <input type="email" id="email" [(ngModel)]="email" name="email" placeholder="Enter email address" required>
+      </div>
+      <div class="form-group">
+        <label for="department">Department *</label>
+        <select id="department" [(ngModel)]="department" name="department" required>
+          <option value="">Select Department</option>
+          <option value="Engineering">Engineering</option>
+          <option value="Marketing">Marketing</option>
+          <option value="HR">HR</option>
+          <option value="Finance">Finance</option>
+          <option value="Sales">Sales</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="salary">Salary</label>
+        <input type="number" id="salary" [(ngModel)]="salary" name="salary" placeholder="Enter salary" min="0">
+      </div>
+      <button type="submit" class="btn btn-primary" id="submitBtn">
+        {{ editMode ? 'Update Employee' : 'Save Employee' }}
+      </button>
+    </form>
+  </div>
+</div>
+<div class="footer">
+  <p>&copy; 2024 Employee Management System - Angular Application</p>
+</div>

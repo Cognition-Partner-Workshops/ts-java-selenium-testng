@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Form - Employee Management System (.NET MVC)</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/dashboard" class="brand">Employee Management (.NET MVC)</a>
+    <div class="nav-links">
+      <a href="/dashboard" id="nav-dashboard">Dashboard</a>
+      <a href="/employees" class="active" id="nav-employees">Employees</a>
+      <a href="#" onclick="logout()" id="nav-logout">Logout</a>
+    </div>
+  </nav>
+  <div class="container">
+    <div class="page-header">
+      <h1 id="formTitle">Add Employee</h1>
+      <a href="/employees" class="btn btn-secondary">Back to List</a>
+    </div>
+    <div class="alert alert-danger" id="errorAlert"></div>
+    <div class="alert alert-success" id="successAlert"></div>
+    <div class="card">
+      <form id="employeeForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="employeeId">
+        <div class="form-group">
+          <label for="name">Full Name *</label>
+          <input type="text" id="name" name="name" placeholder="Enter full name" required>
+          <span class="error" id="nameError">Name is required</span>
+        </div>
+        <div class="form-group">
+          <label for="email">Email Address *</label>
+          <input type="email" id="email" name="email" placeholder="Enter email address" required>
+          <span class="error" id="emailError">Valid email is required</span>
+        </div>
+        <div class="form-group">
+          <label for="department">Department *</label>
+          <select id="department" name="department" required>
+            <option value="">Select Department</option>
+            <option value="Engineering">Engineering</option>
+            <option value="Marketing">Marketing</option>
+            <option value="HR">HR</option>
+            <option value="Finance">Finance</option>
+            <option value="Sales">Sales</option>
+          </select>
+          <span class="error" id="deptError">Department is required</span>
+        </div>
+        <div class="form-group">
+          <label for="salary">Salary</label>
+          <input type="number" id="salary" name="salary" placeholder="Enter salary" min="0">
+        </div>
+        <button type="submit" class="btn btn-primary" id="submitBtn">Save Employee</button>
+      </form>
+    </div>
+  </div>
+  <div class="footer">
+    <p>&copy; 2024 Employee Management System - Legacy .NET MVC Application</p>
+  </div>
+  <script>
+    let editMode = false;
+    (function() {
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      if (!user) { window.location.href = '/login'; return; }
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (id) { editMode = true; loadEmployee(id); }
+    })();
+    async function loadEmployee(id) {
+      try {
+        const res = await fetch('/api/employees/' + id);
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('formTitle').textContent = 'Edit Employee';
+          document.getElementById('submitBtn').textContent = 'Update Employee';
+          document.getElementById('employeeId').value = data.data.id;
+          document.getElementById('name').value = data.data.name;
+          document.getElementById('email').value = data.data.email;
+          document.getElementById('department').value = data.data.department;
+          document.getElementById('salary').value = data.data.salary;
+        }
+      } catch (err) { console.error('Failed to load employee', err); }
+    }
+    async function handleSubmit(e) {
+      e.preventDefault();
+      const errorAlert = document.getElementById('errorAlert');
+      const successAlert = document.getElementById('successAlert');
+      errorAlert.style.display = 'none';
+      successAlert.style.display = 'none';
+      const payload = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        department: document.getElementById('department').value,
+        salary: parseInt(document.getElementById('salary').value) || 0
+      };
+      if (!payload.name || !payload.email || !payload.department) {
+        errorAlert.textContent = 'Please fill in all required fields';
+        errorAlert.style.display = 'block';
+        return;
+      }
+      try {
+        const id = document.getElementById('employeeId').value;
+        const url = editMode ? '/api/employees/' + id : '/api/employees';
+        const method = editMode ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (data.success) {
+          successAlert.textContent = editMode ? 'Employee updated successfully!' : 'Employee added successfully!';
+          successAlert.style.display = 'block';
+          if (!editMode) { document.getElementById('employeeForm').reset(); }
+          setTimeout(() => { window.location.href = '/employees'; }, 1500);
+        } else {
+          errorAlert.textContent = data.message || 'Operation failed';
+          errorAlert.style.display = 'block';
+        }
+      } catch (err) {
+        errorAlert.textContent = 'Connection error. Please try again.';
+        errorAlert.style.display = 'block';
+      }
+    }
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+  </script>
+</body>
+</html>
