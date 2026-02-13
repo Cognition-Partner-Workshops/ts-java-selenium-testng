@@ -1,0 +1,29 @@
+<div class="dashboard-container">
+  <nav class="dashboard-nav">
+    <h2 class="nav-title">Angular Demo App</h2>
+    <button
+      class="logout-button"
+      (click)="onLogout()"
+      data-testid="logout-button"
+    >
+      Logout
+    </button>
+  </nav>
+
+  <div class="dashboard-content">
+    <div class="welcome-card">
+      <h1 class="welcome-title" data-testid="welcome-message">
+        Welcome, {{ username }}!
+      </h1>
+      <p class="welcome-subtitle">
+        You have successfully logged into the Angular Demo Application.
+      </p>
+      <div class="dashboard-info">
+        <div class="info-card">
+          <h3>Dashboard</h3>
+          <p>This is a demo dashboard page showcasing Playwright with Cucumber BDD testing on an Angular application.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
