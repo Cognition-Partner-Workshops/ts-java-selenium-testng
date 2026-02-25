@@ -6,7 +6,9 @@ function getValidUsers(): Array<{ username: string; password: string }> {
   const credentials = process.env.LOGIN_CREDENTIALS || "";
   if (!credentials) return [];
   return credentials.split(",").map((pair) => {
-    const [username, password] = pair.split(":");
+    const idx = pair.indexOf(":");
+    const username = pair.substring(0, idx);
+    const password = pair.substring(idx + 1);
     return { username, password };
   });
 }
