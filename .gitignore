@@ -5,4 +5,9 @@
 /ExtentReports/
 logfile.log
 /test-output/
+node_modules/
+dist/
+playwright-report/
+test-results/
+package-lock.json
 

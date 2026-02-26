@@ -1,0 +1,21 @@
+{
+  "name": "ts-selenium-simple",
+  "version": "1.0.0",
+  "description": "selenium-testng-framework\r ---",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug",
+    "typecheck": "tsc --noEmit",
+    "test:report": "npx playwright show-report"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.3.1",
+    "typescript": "^5.9.3"
+  }
+}
