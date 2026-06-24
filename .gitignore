@@ -1,8 +1,8 @@
-/target/
-.project
-.classpath
-/.settings/
-/ExtentReports/
-logfile.log
-/test-output/
-
+node_modules/
+dist/
+test-results/
+playwright-report/
+playwright/.auth/
+blob-report/
+.env
+*.tsbuildinfo
