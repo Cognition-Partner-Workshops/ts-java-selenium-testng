@@ -1,36 +1,52 @@
 import { test, expect } from '@playwright/test';
-import { PortalPage } from '../../pages/PortalPage';
+import { USERNAME, PASSWORD } from '../../utils/test-config';
+import { loginToPortal, openBenefitsManagement, openConfigurationScreen, trackGatewayResponses, captureStep, writeEvidence, failedApiResponses, ApiResponse } from '../../utils/helpers';
 import { HierarchyPage } from '../../pages/HierarchyPage';
-import { generateUniqueName } from '../../utils/helpers';
 
-test.describe('Hierarchy - Regression Tests', () => {
-  let portalPage: PortalPage;
-  let hierarchyPage: HierarchyPage;
+test.describe('Hierarchy Tests', () => {
+  test('TC#9 - Create hierarchy with Category, Component, and Attribute', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
 
-  test.beforeEach(async ({ page }) => {
-    portalPage = new PortalPage(page);
-    hierarchyPage = new HierarchyPage(page);
-    await page.goto('/portal#/');
-    await portalPage.clickBenefitsManagement();
-  });
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = {
+      screen: 'Benefits Management / Configurations / Hierarchy',
+      scenario: 'TC#9: Create Hierarchy',
+      categoryCreated: false,
+      componentCreated: false,
+      attributeCreated: false,
+    };
+    trackGatewayResponses(page.context(), apiResponses);
 
-  test('TC#9 - Users to create Hierarchy successfully', async ({ page }) => {
-    // Navigate to Configuration > Benefit Hierarchy
-    await hierarchyPage.navigateToHierarchy();
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Hierarchy');
+    const hierarchyPage = new HierarchyPage(benefitsPage);
 
-    // Create Categories
-    const categoryName = generateUniqueName('Category');
-    await hierarchyPage.createCategory(categoryName);
+    try {
+      const categoryName = await hierarchyPage.createCategory();
+      evidence.categoryName = categoryName;
+      evidence.categoryCreated = true;
+      await captureStep(benefitsPage, testInfo, 'category-created');
 
-    // Create Components
-    const componentName = generateUniqueName('Component');
-    await hierarchyPage.createComponent(componentName);
+      const componentName = await hierarchyPage.createComponent(categoryName);
+      evidence.componentName = componentName;
+      evidence.componentCreated = true;
+      await captureStep(benefitsPage, testInfo, 'component-created');
 
-    // Create Attributes
-    const attributeName = generateUniqueName('Attribute');
-    await hierarchyPage.createAttribute(attributeName);
+      const attributeName = await hierarchyPage.createAttribute(componentName);
+      evidence.attributeName = attributeName;
+      evidence.attributeCreated = true;
+      await captureStep(benefitsPage, testInfo, 'attribute-created');
 
-    // Verify hierarchical setup was created
-    await hierarchyPage.verifyHierarchyCreated();
+      await hierarchyPage.verifyHierarchyNodeExists(categoryName);
+      await hierarchyPage.verifyHierarchyNodeExists(componentName);
+      await hierarchyPage.verifyHierarchyNodeExists(attributeName);
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'hierarchy-evidence.json', evidence);
+    }
+
+    expect(failedApiResponses(apiResponses), `API errors: ${JSON.stringify(apiResponses)}`).toEqual([]);
   });
 });

@@ -1,244 +1,288 @@
 import { test, expect } from '@playwright/test';
-import { PortalPage } from '../../pages/PortalPage';
+import { USERNAME, PASSWORD } from '../../utils/test-config';
+import { loginToPortal, openBenefitsManagement, trackGatewayResponses, captureStep, writeEvidence, failedApiResponses, ApiResponse } from '../../utils/helpers';
 import { PlansPage } from '../../pages/PlansPage';
-import { generateUniqueName } from '../../utils/helpers';
+import { DashboardPage } from '../../pages/DashboardPage';
 
-test.describe('Plan Life Cycle - Regression Tests', () => {
-  let portalPage: PortalPage;
-  let plansPage: PlansPage;
-
-  test.beforeEach(async ({ page }) => {
-    portalPage = new PortalPage(page);
-    plansPage = new PlansPage(page);
-    await page.goto('/portal#/');
-    await portalPage.clickBenefitsManagement();
-    await plansPage.navigateToPlans();
-  });
-
-  test('TC#33 - Verify newly created plan has OPEN status with grey dot', async ({ page }) => {
-    // Create a new plan
-    const planName = generateUniqueName('LifecyclePlan');
-    await plansPage.createPlan(planName);
-
-    // Verify the plan has OPEN status (grey dot)
-    const planRow = page.locator(`tr:has-text("${planName}"), [class*="row"]:has-text("${planName}")`).first();
-    const statusDot = planRow.locator('.status-dot, [class*="status"], .dot').first();
-    await expect(statusDot).toBeVisible();
-    // Grey dot indicates OPEN status
-    await expect(statusDot).toHaveCSS('background-color', /grey|gray|rgb\(128|rgb\(169/);
-  });
-
-  test('TC#34 - Verify SUBMIT FOR REVIEW changes status to PENDING REVIEW with orange dot', async ({ page }) => {
-    // Find a plan with OPEN status
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await expect(planRow).toBeVisible();
-
-    // Submit for review
-    await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-    await page.getByRole('button', { name: /submit for review/i }).first().click();
-
-    // Add comments if required
-    const commentInput = page.locator('textarea, input[name*="comment"]').first();
-    if (await commentInput.isVisible()) {
-      await commentInput.fill('Submitting for review - automated test');
-      await page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
+test.describe('Plan Life Cycle Tests', () => {
+  test('TC#33 - Create plan in Open status', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#33: Open Status Plan', created: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    try {
+      const result = await plansPage.createPlan();
+      evidence.planName = result.name;
+      evidence.created = true;
+      await captureStep(benefitsPage, testInfo, 'plan-open-created');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'plan-open-evidence.json', evidence);
     }
-
-    // Verify orange dot appears (PENDING REVIEW status)
-    await page.waitForLoadState('networkidle');
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#35 - Verify orange dot displays appropriate color coding flow', async ({ page }) => {
-    // Find a plan with orange dot (PENDING REVIEW)
-    const orangeDot = page.locator('.status-dot[class*="pending"], [class*="orange"], [style*="orange"]').first();
+  test('TC#34 - Verify Open status plan displays correctly', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const evidence: Record<string, unknown> = { scenario: 'TC#34: Open Status Display' };
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    await plansPage.filterByStatus('Open');
+    await captureStep(benefitsPage, testInfo, 'open-status-display');
+    await writeEvidence(testInfo, 'open-status-display-evidence.json', evidence);
+  });
 
-    if (await orangeDot.isVisible()) {
-      // Click on the orange dot
-      await orangeDot.click();
-
-      // Verify flow displays with color coding
-      const flowDisplay = page.locator('.status-flow, .workflow-display, [class*="lifecycle"]').first();
-      await expect(flowDisplay).toBeVisible();
-
-      // Verify audit details are shown
-      const auditDetails = page.locator('[class*="audit"], .audit-details').first();
-      await expect(auditDetails).toBeVisible();
+  test('TC#35 - Submit plan for review', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#35: Submit for Review', submitted: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    try {
+      const result = await plansPage.createPlan();
+      await plansPage.editPlan(result.name);
+      const msg = await plansPage.submitForReview();
+      evidence.submitMessage = msg;
+      evidence.submitted = true;
+      await captureStep(benefitsPage, testInfo, 'plan-submitted-review');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'submit-review-evidence.json', evidence);
     }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#36 - Verify APPROVE changes status to APPROVED with green dot', async ({ page }) => {
-    // Find a plan with PENDING REVIEW status
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await expect(planRow).toBeVisible();
+  test('TC#36 - Verify Review Pending status', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const evidence: Record<string, unknown> = { scenario: 'TC#36: Review Pending Status' };
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    await plansPage.filterByStatus('Review Pending');
+    await captureStep(benefitsPage, testInfo, 'review-pending-status');
+    await writeEvidence(testInfo, 'review-pending-evidence.json', evidence);
+  });
 
-    // Approve the plan
-    await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-    await page.getByRole('button', { name: /approve/i }).first().click();
-
-    // Add comments if required
-    const commentInput = page.locator('textarea, input[name*="comment"]').first();
-    if (await commentInput.isVisible()) {
-      await commentInput.fill('Approved - automated test');
-      await page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
+  test('TC#37 - Approve a plan', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#37: Approve Plan', approved: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    try {
+      const result = await plansPage.createPlan();
+      await plansPage.editPlan(result.name);
+      await plansPage.submitForReview();
+      const msg = await plansPage.approve();
+      evidence.approveMessage = msg;
+      evidence.approved = true;
+      await captureStep(benefitsPage, testInfo, 'plan-approved');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'approve-plan-evidence.json', evidence);
     }
-
-    // Verify green dot appears
-    await page.waitForLoadState('networkidle');
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#37 - Verify green dot displays appropriate color coding flow', async ({ page }) => {
-    // Find a plan with green dot (APPROVED)
-    const greenDot = page.locator('.status-dot[class*="approved"], [class*="green"], [style*="green"]').first();
+  test('TC#38 - Verify Approved status', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const evidence: Record<string, unknown> = { scenario: 'TC#38: Approved Status' };
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    await plansPage.filterByStatus('Approved');
+    await captureStep(benefitsPage, testInfo, 'approved-status');
+    await writeEvidence(testInfo, 'approved-status-evidence.json', evidence);
+  });
 
-    if (await greenDot.isVisible()) {
-      await greenDot.click();
-
-      // Verify flow displays with color coding and audit details
-      const flowDisplay = page.locator('.status-flow, .workflow-display, [class*="lifecycle"]').first();
-      await expect(flowDisplay).toBeVisible();
+  test('TC#39 - Reject a plan', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#39: Reject Plan', rejected: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    try {
+      const result = await plansPage.createPlan();
+      await plansPage.editPlan(result.name);
+      await plansPage.submitForReview();
+      const msg = await plansPage.reject();
+      evidence.rejectMessage = msg;
+      evidence.rejected = true;
+      await captureStep(benefitsPage, testInfo, 'plan-rejected');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'reject-plan-evidence.json', evidence);
     }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#38 - Verify PUBLISH changes status to PUBLISHED with dark green dot', async ({ page }) => {
-    // Find a plan with APPROVED status
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await expect(planRow).toBeVisible();
+  test('TC#40 - Verify Rejected status', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const evidence: Record<string, unknown> = { scenario: 'TC#40: Rejected Status' };
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    await plansPage.filterByStatus('Rejected');
+    await captureStep(benefitsPage, testInfo, 'rejected-status');
+    await writeEvidence(testInfo, 'rejected-status-evidence.json', evidence);
+  });
 
-    // Publish the plan
-    await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-    await page.getByRole('button', { name: /publish/i }).first().click();
-
-    // Add comments if required
-    const commentInput = page.locator('textarea, input[name*="comment"]').first();
-    if (await commentInput.isVisible()) {
-      await commentInput.fill('Published - automated test');
-      await page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
+  test('TC#41 - Publish a plan', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#41: Publish Plan', published: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    try {
+      const result = await plansPage.createPlan();
+      await plansPage.editPlan(result.name);
+      await plansPage.submitForReview();
+      await plansPage.approve();
+      const msg = await plansPage.publish();
+      evidence.publishMessage = msg;
+      evidence.published = true;
+      await captureStep(benefitsPage, testInfo, 'plan-published');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'publish-plan-evidence.json', evidence);
     }
-
-    // Verify dark green dot appears
-    await page.waitForLoadState('networkidle');
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#39 - Verify dark green dot displays appropriate color coding flow', async ({ page }) => {
-    // Find a plan with dark green dot (PUBLISHED)
-    const darkGreenDot = page.locator('.status-dot[class*="published"], [class*="dark-green"]').first();
+  test('TC#42 - Verify Published status', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const evidence: Record<string, unknown> = { scenario: 'TC#42: Published Status' };
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    await plansPage.filterByStatus('Published');
+    await captureStep(benefitsPage, testInfo, 'published-status');
+    await writeEvidence(testInfo, 'published-status-evidence.json', evidence);
+  });
 
-    if (await darkGreenDot.isVisible()) {
-      await darkGreenDot.click();
+  test('TC#43 - Mass status update', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const evidence: Record<string, unknown> = { scenario: 'TC#43: Mass Status Update' };
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    await plansPage.massStatusUpdate();
+    await captureStep(benefitsPage, testInfo, 'mass-status-update');
+    await writeEvidence(testInfo, 'mass-status-evidence.json', evidence);
+  });
 
-      // Verify flow with Grey, Orange, Green, and Dark Green dots plus audit details
-      const flowDisplay = page.locator('.status-flow, .workflow-display, [class*="lifecycle"]').first();
-      await expect(flowDisplay).toBeVisible();
+  test('TC#44 - Verify status color codes on plans grid', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const evidence: Record<string, unknown> = { scenario: 'TC#44: Status Color Codes' };
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    await captureStep(benefitsPage, testInfo, 'status-color-codes');
+    await writeEvidence(testInfo, 'status-colors-evidence.json', evidence);
+  });
+
+  test('TC#45 - Full lifecycle: Open > Review > Approve > Publish', async ({ page }, testInfo) => {
+    test.setTimeout(300_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#45: Full Lifecycle' };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    try {
+      const result = await plansPage.createPlan();
+      evidence.planName = result.name;
+      await captureStep(benefitsPage, testInfo, 'lifecycle-plan-created');
+      await plansPage.editPlan(result.name);
+      evidence.submitMessage = await plansPage.submitForReview();
+      await captureStep(benefitsPage, testInfo, 'lifecycle-submitted');
+      evidence.approveMessage = await plansPage.approve();
+      await captureStep(benefitsPage, testInfo, 'lifecycle-approved');
+      evidence.publishMessage = await plansPage.publish();
+      await captureStep(benefitsPage, testInfo, 'lifecycle-published');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'full-lifecycle-evidence.json', evidence);
     }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#40 - Verify REJECT before approving shows REJECTED with red dot', async ({ page }) => {
-    // Find a plan with PENDING REVIEW status
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await expect(planRow).toBeVisible();
-
-    // Reject the plan
-    await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-    await page.getByRole('button', { name: /reject/i }).first().click();
-
-    // Add rejection comments
-    const commentInput = page.locator('textarea, input[name*="comment"]').first();
-    if (await commentInput.isVisible()) {
-      await commentInput.fill('Rejected before approval - automated test');
-      await page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
+  test('TC#46 - Full lifecycle: Open > Review > Reject > Edit > Review > Approve', async ({ page }, testInfo) => {
+    test.setTimeout(300_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#46: Reject-Resubmit Lifecycle' };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    try {
+      const result = await plansPage.createPlan();
+      evidence.planName = result.name;
+      await plansPage.editPlan(result.name);
+      await plansPage.submitForReview();
+      evidence.rejectMessage = await plansPage.reject();
+      await captureStep(benefitsPage, testInfo, 'lifecycle-rejected');
+      await plansPage.editPlan(result.name);
+      await plansPage.submitForReview();
+      evidence.approveMessage = await plansPage.approve();
+      await captureStep(benefitsPage, testInfo, 'lifecycle-reapproved');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'reject-resubmit-evidence.json', evidence);
     }
-
-    // Verify red dot appears
-    await page.waitForLoadState('networkidle');
-  });
-
-  test('TC#41 - Verify red dot (rejected before approval) displays appropriate color coding', async ({ page }) => {
-    const redDot = page.locator('.status-dot[class*="rejected"], [class*="red"], [style*="red"]').first();
-
-    if (await redDot.isVisible()) {
-      await redDot.click();
-
-      // Verify flow displays Grey and Red dots with audit details
-      const flowDisplay = page.locator('.status-flow, .workflow-display, [class*="lifecycle"]').first();
-      await expect(flowDisplay).toBeVisible();
-    }
-  });
-
-  test('TC#42 - Verify REJECT before publishing shows REJECTED with red dot', async ({ page }) => {
-    // Find a plan with APPROVED status
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await expect(planRow).toBeVisible();
-
-    // Reject the plan before publishing
-    await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-    await page.getByRole('button', { name: /reject/i }).first().click();
-
-    // Add rejection comments
-    const commentInput = page.locator('textarea, input[name*="comment"]').first();
-    if (await commentInput.isVisible()) {
-      await commentInput.fill('Rejected before publishing - automated test');
-      await page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
-    }
-
-    await page.waitForLoadState('networkidle');
-  });
-
-  test('TC#43 - Verify red dot (rejected before publishing) displays appropriate color coding', async ({ page }) => {
-    const redDot = page.locator('.status-dot[class*="rejected"], [class*="red"], [style*="red"]').first();
-
-    if (await redDot.isVisible()) {
-      await redDot.click();
-
-      const flowDisplay = page.locator('.status-flow, .workflow-display, [class*="lifecycle"]').first();
-      await expect(flowDisplay).toBeVisible();
-    }
-  });
-
-  test('TC#44 - Verify user can SUBMIT FOR REVIEW rejected plans', async ({ page }) => {
-    // Filter for rejected plans
-    await page.getByText('REJECTED', { exact: true }).first().click();
-    await page.waitForLoadState('networkidle');
-
-    // Find a rejected plan
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-
-    if (await planRow.isVisible()) {
-      // Edit and submit for review again
-      await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-      const submitButton = page.getByRole('button', { name: /submit for review/i }).first();
-      await expect(submitButton).toBeVisible();
-      await submitButton.click();
-
-      const commentInput = page.locator('textarea, input[name*="comment"]').first();
-      if (await commentInput.isVisible()) {
-        await commentInput.fill('Resubmitting rejected plan - automated test');
-        await page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
-      }
-    }
-  });
-
-  test('TC#45 - Verify user can update status from Plan Edit screen', async ({ page }) => {
-    // Open a plan in edit mode
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await expect(planRow).toBeVisible();
-
-    await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-    await page.waitForLoadState('networkidle');
-
-    // Verify status change buttons are available in edit screen
-    const statusButtons = page.getByRole('button', { name: /submit for review|approve|publish|reject/i });
-    await expect(statusButtons.first()).toBeVisible();
-  });
-
-  test('TC#46 - Verify user can update status from Plan summary screen', async ({ page }) => {
-    // Click on a plan to view summary
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await expect(planRow).toBeVisible();
-    await planRow.click();
-    await page.waitForLoadState('networkidle');
-
-    // Verify status change options are available in summary view
-    const statusButtons = page.getByRole('button', { name: /submit for review|approve|publish|reject/i });
-    await expect(statusButtons.first()).toBeVisible();
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 });

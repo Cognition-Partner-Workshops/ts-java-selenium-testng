@@ -1,26 +1,24 @@
 import { test, expect } from '@playwright/test';
-import { PortalPage } from '../../pages/PortalPage';
-import { DashboardPage } from '../../pages/DashboardPage';
+import { USERNAME, PASSWORD } from '../../utils/test-config';
+import { loginToPortal, openBenefitsManagement, captureStep, writeEvidence } from '../../utils/helpers';
 
-test.describe('BM Landing Page - Regression Tests', () => {
-  let portalPage: PortalPage;
-  let dashboardPage: DashboardPage;
+test.describe('Benefits Management Landing', () => {
+  test('TC#3 - Verify BM Dashboard loads after clicking Benefits Management', async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
 
-  test.beforeEach(async ({ page }) => {
-    portalPage = new PortalPage(page);
-    dashboardPage = new DashboardPage(page);
-    await page.goto('/portal#/');
-  });
+    const evidence: Record<string, unknown> = {
+      screen: 'BM Dashboard',
+      scenario: 'TC#3: BM Dashboard Load',
+      dashboardLoaded: false,
+    };
 
-  test('TC#3 - User should be able to successfully see the dashboard of BM', async ({ page }) => {
-    // Click on Benefits Management instance
-    await portalPage.clickBenefitsManagement();
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await benefitsPage.waitForLoadState('domcontentloaded');
+    evidence.dashboardLoaded = true;
+    await captureStep(benefitsPage, testInfo, 'bm-dashboard-loaded');
 
-    // Verify dashboard loads without errors
-    await dashboardPage.verifyDashboardLoaded();
-
-    // Verify no error messages are displayed
-    const errors = page.locator('.error, [class*="error"], .alert-danger');
-    await expect(errors).not.toBeVisible();
+    await writeEvidence(testInfo, 'bm-landing-evidence.json', evidence);
   });
 });

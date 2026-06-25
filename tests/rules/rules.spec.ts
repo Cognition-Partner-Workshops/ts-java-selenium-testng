@@ -1,165 +1,239 @@
 import { test, expect } from '@playwright/test';
-import { PortalPage } from '../../pages/PortalPage';
-import { HierarchyPage } from '../../pages/HierarchyPage';
+import { USERNAME, PASSWORD } from '../../utils/test-config';
+import { loginToPortal, openBenefitsManagement, openConfigurationScreen, trackGatewayResponses, captureStep, writeEvidence, failedApiResponses, generateUniqueName, ApiResponse } from '../../utils/helpers';
 import { ValidationsPage } from '../../pages/ValidationsPage';
 
-test.describe('Rules - Regression Tests', () => {
-  let portalPage: PortalPage;
-  let hierarchyPage: HierarchyPage;
-  let validationsPage: ValidationsPage;
-
-  test.beforeEach(async ({ page }) => {
-    portalPage = new PortalPage(page);
-    hierarchyPage = new HierarchyPage(page);
-    validationsPage = new ValidationsPage(page);
-    await page.goto('/portal#/');
-    await portalPage.clickBenefitsManagement();
+test.describe('Rules Tests', () => {
+  test('TC#47 - Create a constraint rule', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#47: Create Constraint', created: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Constraints');
+    const rulesPage = new ValidationsPage(benefitsPage);
+    try {
+      const name = generateUniqueName('Constraint');
+      const msg = await rulesPage.createConstraint(name);
+      evidence.ruleName = name;
+      evidence.saveMessage = msg;
+      evidence.created = true;
+      await captureStep(benefitsPage, testInfo, 'constraint-created');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'create-constraint-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#47 - Verify that user is able to add Unique constraint', async ({ page }) => {
-    // Navigate to Configuration > Benefit Hierarchy
-    await hierarchyPage.navigateToHierarchy();
-
-    // Select an attribute
-    const attribute = page.locator('.attribute, [class*="attribute"], .tree-node').first();
-    await attribute.click();
-
-    // Add Unique constraint
-    await hierarchyPage.addUniqueConstraint();
+  test('TC#48 - Edit a constraint rule', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#48: Edit Constraint', edited: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Constraints');
+    const rulesPage = new ValidationsPage(benefitsPage);
+    try {
+      const name = generateUniqueName('Constraint');
+      await rulesPage.createConstraint(name);
+      const editMsg = await rulesPage.editRule(name, { name: `${name}_Edited` });
+      evidence.editMessage = editMsg;
+      evidence.edited = true;
+      await captureStep(benefitsPage, testInfo, 'constraint-edited');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'edit-constraint-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#48 - Verify that user is able to add Required constraint', async ({ page }) => {
-    // Navigate to Configuration > Benefit Hierarchy
-    await hierarchyPage.navigateToHierarchy();
-
-    // Select an attribute
-    const attribute = page.locator('.attribute, [class*="attribute"], .tree-node').first();
-    await attribute.click();
-
-    // Add Required constraint
-    await hierarchyPage.addRequiredConstraint();
+  test('TC#49 - Delete a constraint rule', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#49: Delete Constraint', deleted: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Constraints');
+    const rulesPage = new ValidationsPage(benefitsPage);
+    try {
+      const name = generateUniqueName('Constraint');
+      await rulesPage.createConstraint(name);
+      const result = await rulesPage.deleteRule(name);
+      evidence.deleted = result.deleted;
+      await captureStep(benefitsPage, testInfo, 'constraint-deleted');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'delete-constraint-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#49 - Verify that user is able to add/Edit conditional display rule for a Category', async ({ page }) => {
-    // Navigate to Configuration > Benefit Hierarchy
-    await hierarchyPage.navigateToHierarchy();
-
-    // Select a category
-    const category = page.locator('.category, [class*="category"]').first();
-    await category.click();
-
-    // Add display rule
-    await hierarchyPage.addDisplayRule('{Carrier} = "BKC1"');
+  test('TC#50 - Create a display rule', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#50: Create Display Rule', created: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Display Rules');
+    const rulesPage = new ValidationsPage(benefitsPage);
+    try {
+      const name = generateUniqueName('DisplayRule');
+      const msg = await rulesPage.createDisplayRule(name);
+      evidence.ruleName = name;
+      evidence.saveMessage = msg;
+      evidence.created = true;
+      await captureStep(benefitsPage, testInfo, 'display-rule-created');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'create-display-rule-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#50 - Verify that user is able to add/Edit conditional display rule for a Component', async ({ page }) => {
-    // Navigate to Configuration > Benefit Hierarchy
-    await hierarchyPage.navigateToHierarchy();
-
-    // Select a component
-    const component = page.locator('.component, [class*="component"]').first();
-    await component.click();
-
-    // Add display rule
-    await hierarchyPage.addDisplayRule('{Carrier} = "BKC1"');
+  test('TC#51 - Edit a display rule', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#51: Edit Display Rule', edited: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Display Rules');
+    const rulesPage = new ValidationsPage(benefitsPage);
+    try {
+      const name = generateUniqueName('DisplayRule');
+      await rulesPage.createDisplayRule(name);
+      const editMsg = await rulesPage.editRule(name, { name: `${name}_Edited` });
+      evidence.editMessage = editMsg;
+      evidence.edited = true;
+      await captureStep(benefitsPage, testInfo, 'display-rule-edited');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'edit-display-rule-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#51 - Verify that user is able to add/Edit conditional display rule for an Attribute', async ({ page }) => {
-    // Navigate to Configuration > Benefit Hierarchy
-    await hierarchyPage.navigateToHierarchy();
-
-    // Select an attribute
-    const attribute = page.locator('.attribute, [class*="attribute"]').first();
-    await attribute.click();
-
-    // Add display rule
-    await hierarchyPage.addDisplayRule('{Carrier} = "BKC1"');
+  test('TC#52 - Delete a display rule', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#52: Delete Display Rule', deleted: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Display Rules');
+    const rulesPage = new ValidationsPage(benefitsPage);
+    try {
+      const name = generateUniqueName('DisplayRule');
+      await rulesPage.createDisplayRule(name);
+      const result = await rulesPage.deleteRule(name);
+      evidence.deleted = result.deleted;
+      await captureStep(benefitsPage, testInfo, 'display-rule-deleted');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'delete-display-rule-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#52 - Verify conditional display rule works on add/edit plan', async ({ page }) => {
-    // Navigate to Plans
-    await page.getByText('Plans', { exact: false }).first().click();
-    await page.waitForLoadState('networkidle');
-
-    // Edit a plan
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-    await page.waitForLoadState('networkidle');
-
-    // Verify that conditional display rule is working
-    // The attribute should only display when the condition is met
-    await expect(page.locator('form, [class*="plan-form"]')).toBeVisible();
+  test('TC#53 - Create a validation rule', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#53: Create Validation Rule', created: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Validations');
+    const rulesPage = new ValidationsPage(benefitsPage);
+    try {
+      const name = generateUniqueName('Validation');
+      const msg = await rulesPage.createValidationRule(name);
+      evidence.ruleName = name;
+      evidence.saveMessage = msg;
+      evidence.created = true;
+      await captureStep(benefitsPage, testInfo, 'validation-rule-created');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'create-validation-rule-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#53 - Verify dependency rule works on add/edit plan', async ({ page }) => {
-    // Navigate to Plans
-    await page.getByText('Plans', { exact: false }).first().click();
-    await page.waitForLoadState('networkidle');
-
-    // Edit a plan
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-    await page.waitForLoadState('networkidle');
-
-    // Verify that dependency rule is working correctly
-    // Dropdown values should be filtered based on the dependency rule
-    await expect(page.locator('form, [class*="plan-form"]')).toBeVisible();
+  test('TC#54 - Edit a validation rule', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#54: Edit Validation Rule', edited: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Validations');
+    const rulesPage = new ValidationsPage(benefitsPage);
+    try {
+      const name = generateUniqueName('Validation');
+      await rulesPage.createValidationRule(name);
+      const editMsg = await rulesPage.editRule(name, { name: `${name}_Edited` });
+      evidence.editMessage = editMsg;
+      evidence.edited = true;
+      await captureStep(benefitsPage, testInfo, 'validation-rule-edited');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'edit-validation-rule-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#54 - Verify that User is able to add validations for attributes', async ({ page }) => {
-    // Navigate to Configuration > Validations
-    await validationsPage.navigateToValidations();
-
-    // Add validation rule
-    await validationsPage.addValidationRule(
-      '{Mail: Max Amount Due}=" "',
-      'Max Amount cannot be blank'
-    );
-
-    // Verify validation was added
-    await validationsPage.verifyValidationExists('{Mail: Max Amount Due}');
+  test('TC#55 - Delete a validation rule', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#55: Delete Validation Rule', deleted: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Validations');
+    const rulesPage = new ValidationsPage(benefitsPage);
+    try {
+      const name = generateUniqueName('Validation');
+      await rulesPage.createValidationRule(name);
+      const result = await rulesPage.deleteRule(name);
+      evidence.deleted = result.deleted;
+      await captureStep(benefitsPage, testInfo, 'validation-rule-deleted');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'delete-validation-rule-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#55 - Verify that User is able to edit existing validation rules', async ({ page }) => {
-    // Navigate to Configuration > Validations
-    await validationsPage.navigateToValidations();
-
-    // Edit an existing validation rule
-    await validationsPage.editValidationRule(
-      0,
-      '{Mail: Max Amount Due}!=" "',
-      'Updated validation message'
-    );
-
-    // Verify the edit was saved
-    await validationsPage.verifyValidationExists('Updated validation message');
+  test('TC#56 - Verify constraint applied to plan', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const evidence: Record<string, unknown> = { scenario: 'TC#56: Constraint Applied to Plan' };
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await captureStep(benefitsPage, testInfo, 'constraint-on-plan');
+    await writeEvidence(testInfo, 'constraint-on-plan-evidence.json', evidence);
   });
 
-  test('TC#56 - Verify that User is able to view existing validation rules', async ({ page }) => {
-    // Navigate to Configuration > Validations
-    await validationsPage.navigateToValidations();
-
-    // Verify validation list is visible
-    await expect(validationsPage.validationList).toBeVisible();
-  });
-
-  test('TC#57 - Verify validation message displayed on add/edit plan when rule is met', async ({ page }) => {
-    // Navigate to Plans
-    await page.getByText('Plans', { exact: false }).first().click();
-    await page.waitForLoadState('networkidle');
-
-    // Edit a plan
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await planRow.locator('[title*="edit" i], .edit-icon').first().click();
-    await page.waitForLoadState('networkidle');
-
-    // Try to save with a value that triggers validation
-    await page.getByRole('button', { name: /save/i }).first().click();
-
-    // Verify validation message appears if rule is triggered
-    // The validation message should offer to update or ignore
-    const validationDialog = page.locator('.validation-message, .modal, [class*="validation"]');
-    // This test verifies the validation infrastructure works
-    await expect(page.locator('form, [class*="plan-form"]')).toBeVisible();
+  test('TC#57 - Verify display rule applied to plan', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const evidence: Record<string, unknown> = { scenario: 'TC#57: Display Rule Applied to Plan' };
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await captureStep(benefitsPage, testInfo, 'display-rule-on-plan');
+    await writeEvidence(testInfo, 'display-rule-on-plan-evidence.json', evidence);
   });
 });

@@ -1,28 +1,71 @@
 import { test, expect } from '@playwright/test';
-import { PortalPage } from '../../pages/PortalPage';
+import { USERNAME, PASSWORD } from '../../utils/test-config';
+import { loginToPortal, openBenefitsManagement, openConfigurationScreen, trackGatewayResponses, captureStep, writeEvidence, failedApiResponses, generateUniqueName, ApiResponse } from '../../utils/helpers';
 import { ManageDefinitionsPage } from '../../pages/ManageDefinitionsPage';
-import { generateUniqueName } from '../../utils/helpers';
 
-test.describe('Manage Definitions - Regression Tests', () => {
-  let portalPage: PortalPage;
-  let definitionsPage: ManageDefinitionsPage;
+test.describe('Manage Definitions Tests', () => {
+  test('TC#8 - Create a new benefit definition with validation', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
 
-  test.beforeEach(async ({ page }) => {
-    portalPage = new PortalPage(page);
-    definitionsPage = new ManageDefinitionsPage(page);
-    await page.goto('/portal#/');
-    await portalPage.clickBenefitsManagement();
-  });
+    const stamp = generateUniqueName('def');
+    const definition = {
+      name: `AutoDef_${stamp}`,
+      label: `Auto Label ${stamp}`,
+      xmlNode: `auto_xml_${stamp}`,
+      description: `Auto generated definition ${stamp}`,
+      order: '1',
+    };
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = {
+      screen: 'Benefits Management / Configurations / Benefit Definitions',
+      scenario: 'TC#8: Create Benefit Definition',
+      definition,
+      validationMessages: [],
+      saveMessage: '',
+      created: false,
+      deleted: false,
+    };
+    let created = false;
+    trackGatewayResponses(page.context(), apiResponses);
 
-  test('TC#8 - Users to create Definition successfully', async ({ page }) => {
-    // Navigate to Configuration > Benefit Definitions
-    await definitionsPage.navigateToDefinitions();
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Benefit Definitions');
+    const defPage = new ManageDefinitionsPage(benefitsPage);
 
-    // Click '+' button and create a definition
-    const defName = generateUniqueName('TestDefinition');
-    await definitionsPage.addNewDefinition(defName);
+    try {
+      // Test required field validation
+      await defPage.openAddForm();
+      const requiredMsg = await defPage.clickSaveAndReadMessage();
+      evidence.requiredNotification = requiredMsg;
+      evidence.validationMessages = await defPage.getValidationMessages();
+      await captureStep(benefitsPage, testInfo, 'required-field-validation');
 
-    // Validate whether Definition gets saved successfully
-    await definitionsPage.verifyDefinitionExists(defName);
+      // Fill form and save
+      await defPage.fillForm(definition);
+      evidence.saveMessage = await defPage.save();
+      created = true;
+      evidence.created = true;
+      await captureStep(benefitsPage, testInfo, 'definition-created');
+
+      // Verify in grid
+      const rows = await defPage.definitionRows();
+      const found = rows.some((row) => row.some((cell) => cell.includes(definition.name)));
+      expect(found, `Definition "${definition.name}" should appear in the grid`).toBe(true);
+    } finally {
+      if (created) {
+        const cleanup = await defPage.deleteDefinition(definition.name).catch((e) => ({
+          deleted: false,
+          dialogMessage: '',
+          message: (e as Error).message,
+        }));
+        evidence.deleted = cleanup.deleted;
+      }
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'create-definition-evidence.json', evidence);
+    }
+
+    expect(failedApiResponses(apiResponses), `API errors: ${JSON.stringify(apiResponses)}`).toEqual([]);
   });
 });

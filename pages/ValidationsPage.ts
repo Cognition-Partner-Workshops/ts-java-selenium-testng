@@ -1,67 +1,116 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { waitForPageLoad, waitForSuccessMessage } from '../utils/helpers';
+import { readNotificationMessage } from '../utils/helpers';
 
 export class ValidationsPage {
   readonly page: Page;
-  readonly addValidationButton: Locator;
-  readonly conditionInput: Locator;
-  readonly messageInput: Locator;
+  readonly addButton: Locator;
+  readonly nameInput: Locator;
   readonly saveButton: Locator;
-  readonly validationList: Locator;
-  readonly editButton: Locator;
-  readonly definitionDropdown: Locator;
+  readonly cancelButton: Locator;
+  readonly validationsTable: Locator;
+  readonly searchBar: Locator;
+  readonly ruleTypeDropdown: Locator;
+  readonly messageInput: Locator;
+  readonly expressionInput: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.addValidationButton = page.getByRole('button', { name: /add validation|\+/i }).or(
-      page.locator('[data-testid="add-validation"]')
+    this.addButton = page.locator('button.fa-plus-circle').or(
+      page.getByRole('button', { name: /add|\+/i })
     ).first();
-    this.conditionInput = page.getByLabel(/condition|rule/i).or(
-      page.locator('input[name*="condition"], textarea[name*="condition"]')
-    ).first();
-    this.messageInput = page.getByLabel(/message/i).or(
-      page.locator('input[name*="message"], textarea[name*="message"]')
-    ).first();
-    this.saveButton = page.getByRole('button', { name: /save|submit/i }).first();
-    this.validationList = page.locator('.validation-list, table, [class*="validation"]').first();
-    this.editButton = page.locator('[title*="edit" i], .edit-icon, button:has-text("Edit")').first();
-    this.definitionDropdown = page.getByLabel(/definition/i).or(
-      page.locator('select[name*="definition"]')
-    ).first();
+    this.nameInput = page.locator('#name').or(page.locator('input[name="name"]')).first();
+    this.saveButton = page.getByRole('button', { name: /^Save$/i });
+    this.cancelButton = page.locator('#btnCancel').or(page.getByRole('button', { name: /Cancel/i })).first();
+    this.validationsTable = page.locator('table').first();
+    this.searchBar = page.locator('#search-bar-0');
+    this.ruleTypeDropdown = page.locator('#ruleType, select[name*="ruleType"]').first();
+    this.messageInput = page.locator('#message, textarea[name*="message"]').first();
+    this.expressionInput = page.locator('#expression, textarea[name*="expression"]').first();
   }
 
-  async navigateToValidations(): Promise<void> {
-    await this.page.getByText('Configuration', { exact: false }).first().click();
-    await this.page.getByText('Validations', { exact: false }).or(
-      this.page.locator('a[href*="validation"]')
-    ).first().click();
-    await waitForPageLoad(this.page);
-  }
-
-  async addValidationRule(condition: string, message: string): Promise<void> {
-    await this.addValidationButton.click();
-    await this.conditionInput.fill(condition);
-    await this.messageInput.fill(message);
+  async createConstraint(name: string): Promise<string> {
+    await this.addButton.click();
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.fill(name);
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
+    return readNotificationMessage(this.page);
   }
 
-  async editValidationRule(index: number, newCondition: string, newMessage: string): Promise<void> {
-    const rows = this.page.locator('table tbody tr, .validation-row');
-    await rows.nth(index).locator('[title*="edit" i], .edit-icon, button:has-text("Edit")').first().click();
-    await this.conditionInput.clear();
-    await this.conditionInput.fill(newCondition);
-    await this.messageInput.clear();
-    await this.messageInput.fill(newMessage);
+  async createDisplayRule(name: string): Promise<string> {
+    await this.addButton.click();
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.fill(name);
+    if (await this.ruleTypeDropdown.isVisible().catch(() => false)) {
+      await this.ruleTypeDropdown.selectOption('Display');
+    }
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
+    return readNotificationMessage(this.page);
   }
 
-  async verifyValidationExists(condition: string): Promise<void> {
-    await expect(this.page.getByText(condition, { exact: false })).toBeVisible();
+  async createValidationRule(name: string): Promise<string> {
+    await this.addButton.click();
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.fill(name);
+    if (await this.ruleTypeDropdown.isVisible().catch(() => false)) {
+      await this.ruleTypeDropdown.selectOption('Validation');
+    }
+    await this.saveButton.click();
+    return readNotificationMessage(this.page);
   }
 
-  async verifyValidationMessage(message: string): Promise<void> {
-    await expect(this.page.getByText(message, { exact: false })).toBeVisible();
+  async editRule(name: string, updates: { name?: string; message?: string; expression?: string }): Promise<string> {
+    await this.searchRules(name);
+    const row = this.validationsTable.locator('tbody tr').filter({ hasText: name }).first();
+    await row.locator('button.edit, [title*="edit" i]').first().click();
+    if (updates.name) {
+      await this.nameInput.clear();
+      await this.nameInput.fill(updates.name);
+    }
+    if (updates.message && await this.messageInput.isVisible().catch(() => false)) {
+      await this.messageInput.fill(updates.message);
+    }
+    if (updates.expression && await this.expressionInput.isVisible().catch(() => false)) {
+      await this.expressionInput.fill(updates.expression);
+    }
+    await this.saveButton.click();
+    return readNotificationMessage(this.page);
+  }
+
+  async deleteRule(name: string): Promise<{ deleted: boolean }> {
+    await this.searchRules(name);
+    const row = this.validationsTable.locator('tbody tr').filter({ hasText: name }).first();
+    if (!(await row.isVisible().catch(() => false))) {
+      return { deleted: false };
+    }
+    await row.locator('input[type="checkbox"]').first().check();
+    const deleteButton = this.page.locator('button.tableRowDelete').or(
+      this.page.getByRole('button', { name: /delete/i })
+    ).first();
+    const dialogPromise = this.page.waitForEvent('dialog', { timeout: 2_000 })
+      .then(async (dialog) => { await dialog.accept(); return dialog.message(); })
+      .catch(() => '');
+    await deleteButton.click();
+    await dialogPromise;
+    const confirmBtn = this.page.getByRole('button', { name: /^(Yes|OK|Confirm|Delete)$/i }).last();
+    if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await confirmBtn.click();
+    }
+    await this.page.waitForTimeout(1000);
+    return { deleted: true };
+  }
+
+  async searchRules(name: string): Promise<void> {
+    await this.searchBar.click();
+    await this.searchBar.press('Control+A');
+    await this.searchBar.press('Backspace');
+    await this.searchBar.pressSequentially(name, { delay: 10 });
+    await this.searchBar.press('Enter');
+    await this.page.waitForTimeout(500);
+  }
+
+  async ruleRows(): Promise<string[][]> {
+    return this.validationsTable.locator('tbody tr').evaluateAll((rows) =>
+      rows.map((row) => [...(row as HTMLTableRowElement).cells].map((cell) => cell.textContent?.trim() || ''))
+    );
   }
 }

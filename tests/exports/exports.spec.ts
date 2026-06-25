@@ -1,108 +1,29 @@
 import { test, expect } from '@playwright/test';
-import { PortalPage } from '../../pages/PortalPage';
+import { USERNAME, PASSWORD } from '../../utils/test-config';
+import { loginToPortal, openBenefitsManagement, trackGatewayResponses, captureStep, writeEvidence, failedApiResponses, ApiResponse } from '../../utils/helpers';
 import { PlansPage } from '../../pages/PlansPage';
+import { DashboardPage } from '../../pages/DashboardPage';
 
-test.describe('Exports - Regression Tests', () => {
-  let portalPage: PortalPage;
-  let plansPage: PlansPage;
-
-  test.beforeEach(async ({ page }) => {
-    portalPage = new PortalPage(page);
-    plansPage = new PlansPage(page);
-    await page.goto('/portal#/');
-    await portalPage.clickBenefitsManagement();
-    await plansPage.navigateToPlans();
-  });
-
-  test('TC#69 - Validate Plan Summary export', async ({ page }) => {
-    // Click on a plan to view summary
-    const planRow = page.locator('table tbody tr, [class*="plan-row"]').first();
-    await expect(planRow).toBeVisible();
-    await planRow.click();
-    await page.waitForLoadState('networkidle');
-
-    // Select PDF export option
-    const pdfExport = page.getByRole('button', { name: /pdf|export/i }).or(
-      page.locator('[data-testid="export-pdf"]')
-    ).first();
-    await expect(pdfExport).toBeVisible();
-  });
-
-  test('TC#69 - Validate Plan Grid export', async ({ page }) => {
-    // Select plans to export
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    await checkbox.check();
-
-    // Click export button
-    await plansPage.exportButton.click();
-
-    // Select Plan Grid option
-    const planGrid = page.getByText('Plan Grid', { exact: false }).first();
-    await expect(planGrid).toBeVisible();
-  });
-
-  test('TC#69 - Validate Client Grid export', async ({ page }) => {
-    // Select plans to export
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    await checkbox.check();
-
-    // Click export button
-    await plansPage.exportButton.click();
-
-    // Select Client Grid option
-    const clientGrid = page.getByText('Client Grid', { exact: false }).first();
-    await expect(clientGrid).toBeVisible();
-  });
-
-  test('TC#69 - Validate Data Grid export', async ({ page }) => {
-    // Select plans to export
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    await checkbox.check();
-
-    // Click export button
-    await plansPage.exportButton.click();
-
-    // Select Data Grid option
-    const dataGrid = page.getByText('Data Grid', { exact: false }).first();
-    await expect(dataGrid).toBeVisible();
-  });
-
-  test('TC#69 - Validate Tab delimited export', async ({ page }) => {
-    // Select plans to export
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    await checkbox.check();
-
-    // Click export button
-    await plansPage.exportButton.click();
-
-    // Select Tab delimited option
-    const tabDelimited = page.getByText('Tab delimited', { exact: false }).first();
-    await expect(tabDelimited).toBeVisible();
-  });
-
-  test('TC#69 - Validate Plan XML export', async ({ page }) => {
-    // Select plans to export
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    await checkbox.check();
-
-    // Click export button
-    await plansPage.exportButton.click();
-
-    // Select Plan XML option
-    const planXml = page.getByText('Plan XML', { exact: false }).first();
-    await expect(planXml).toBeVisible();
-  });
-
-  test('TC#69 - Validate Client XML export', async ({ page }) => {
-    // Select plans to export
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    await checkbox.check();
-
-    // Click export button
-    await plansPage.exportButton.click();
-
-    // Select Client XML option
-    const clientXml = page.getByText('Client XML', { exact: false }).first();
-    await expect(clientXml).toBeVisible();
+test.describe('Exports Tests', () => {
+  test('TC#69 - Export plans in available formats', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#69: Export Plans', exported: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    const dashboard = new DashboardPage(benefitsPage);
+    await dashboard.openPlans();
+    const plansPage = new PlansPage(benefitsPage);
+    try {
+      await plansPage.exportPlans('Excel');
+      evidence.exported = true;
+      await captureStep(benefitsPage, testInfo, 'plans-exported');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'export-plans-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 });

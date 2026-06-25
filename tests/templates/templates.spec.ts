@@ -1,74 +1,168 @@
 import { test, expect } from '@playwright/test';
-import { PortalPage } from '../../pages/PortalPage';
+import { USERNAME, PASSWORD } from '../../utils/test-config';
+import { loginToPortal, openBenefitsManagement, openConfigurationScreen, trackGatewayResponses, captureStep, writeEvidence, failedApiResponses, generateUniqueName, ApiResponse } from '../../utils/helpers';
 import { TemplatesPage } from '../../pages/TemplatesPage';
-import { generateUniqueName } from '../../utils/helpers';
 
-test.describe('Templates - Regression Tests', () => {
-  let portalPage: PortalPage;
-  let templatesPage: TemplatesPage;
+test.describe('Templates Tests', () => {
+  test('TC#10 - Create a new plan template', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
 
-  test.beforeEach(async ({ page }) => {
-    portalPage = new PortalPage(page);
-    templatesPage = new TemplatesPage(page);
-    await page.goto('/portal#/');
-    await portalPage.clickBenefitsManagement();
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = {
+      screen: 'Benefits Management / Configurations / Plan Templates',
+      scenario: 'TC#10: Create Plan Template',
+      created: false,
+    };
+    let createdName = '';
+    trackGatewayResponses(page.context(), apiResponses);
+
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Plan Templates');
+    const templatesPage = new TemplatesPage(benefitsPage);
+
+    try {
+      const result = await templatesPage.createTemplate();
+      createdName = result.name;
+      evidence.templateName = result.name;
+      evidence.saveMessage = result.message;
+      evidence.created = true;
+      await captureStep(benefitsPage, testInfo, 'template-created');
+
+      const row = await templatesPage.waitForTemplateRow(result.name);
+      expect(row, `Template "${result.name}" should be visible in grid`).toBeTruthy();
+    } finally {
+      if (createdName) {
+        await templatesPage.deleteTemplate(createdName).catch(() => null);
+      }
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'create-template-evidence.json', evidence);
+    }
+
+    expect(failedApiResponses(apiResponses), `API errors: ${JSON.stringify(apiResponses)}`).toEqual([]);
   });
 
-  test('TC#10 - Users to create Template successfully', async ({ page }) => {
-    // Navigate to Configuration > Plan Templates
-    await templatesPage.navigateToTemplates();
+  test('TC#11 - Edit an existing plan template', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
 
-    // Create Template
-    const templateName = generateUniqueName('Template');
-    await templatesPage.createTemplate(templateName);
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = {
+      screen: 'Benefits Management / Configurations / Plan Templates',
+      scenario: 'TC#11: Edit Plan Template',
+      created: false,
+      edited: false,
+    };
+    let createdName = '';
+    trackGatewayResponses(page.context(), apiResponses);
 
-    // Verify template was created
-    await templatesPage.verifyTemplateExists(templateName);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Plan Templates');
+    const templatesPage = new TemplatesPage(benefitsPage);
+
+    try {
+      const result = await templatesPage.createTemplate();
+      createdName = result.name;
+      evidence.templateName = result.name;
+      evidence.created = true;
+      await captureStep(benefitsPage, testInfo, 'template-created-before-edit');
+
+      await templatesPage.openEditForm(result.name);
+      const editedName = `${result.name}_Edited`;
+      await templatesPage.fillForm({ name: editedName, description: 'Edited description' });
+      evidence.editMessage = await templatesPage.save();
+      createdName = editedName;
+      await captureStep(benefitsPage, testInfo, 'template-edited');
+
+      const editedRow = await templatesPage.waitForTemplateRow(editedName);
+      expect(editedRow, `Edited template "${editedName}" should be visible`).toBeTruthy();
+      evidence.edited = true;
+    } finally {
+      if (createdName) {
+        await templatesPage.deleteTemplate(createdName).catch(() => null);
+      }
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'edit-template-evidence.json', evidence);
+    }
+
+    expect(failedApiResponses(apiResponses), `API errors: ${JSON.stringify(apiResponses)}`).toEqual([]);
   });
 
-  test('TC#11 - Verify that User is able to Edit existing Plan Template', async ({ page }) => {
-    // Navigate to Configuration > Plan Templates
-    await templatesPage.navigateToTemplates();
+  test('TC#12 - Copy a plan template', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
 
-    // Create a template first
-    const originalName = generateUniqueName('EditTemplate');
-    await templatesPage.createTemplate(originalName);
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = {
+      screen: 'Benefits Management / Configurations / Plan Templates',
+      scenario: 'TC#12: Copy Plan Template',
+      created: false,
+      copied: false,
+    };
+    let createdName = '';
+    trackGatewayResponses(page.context(), apiResponses);
 
-    // Edit the template
-    const newName = generateUniqueName('EditedTemplate');
-    await templatesPage.editTemplate(originalName, newName);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Plan Templates');
+    const templatesPage = new TemplatesPage(benefitsPage);
 
-    // Verify edited template exists
-    await templatesPage.verifyTemplateExists(newName);
+    try {
+      const result = await templatesPage.createTemplate();
+      createdName = result.name;
+      evidence.created = true;
+
+      await templatesPage.copyTemplate(result.name);
+      evidence.copied = true;
+      await captureStep(benefitsPage, testInfo, 'template-copied');
+    } finally {
+      if (createdName) {
+        await templatesPage.deleteTemplate(createdName).catch(() => null);
+      }
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'copy-template-evidence.json', evidence);
+    }
+
+    expect(failedApiResponses(apiResponses), `API errors: ${JSON.stringify(apiResponses)}`).toEqual([]);
   });
 
-  test('TC#12 - Verify that User is able to Copy existing Plan Template', async ({ page }) => {
-    // Navigate to Configuration > Plan Templates
-    await templatesPage.navigateToTemplates();
+  test('TC#13 - Create a new version of a plan template', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
 
-    // Create a template to copy
-    const templateName = generateUniqueName('CopyTemplate');
-    await templatesPage.createTemplate(templateName);
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = {
+      screen: 'Benefits Management / Configurations / Plan Templates',
+      scenario: 'TC#13: Version Plan Template',
+      created: false,
+      versioned: false,
+    };
+    let createdName = '';
+    trackGatewayResponses(page.context(), apiResponses);
 
-    // Copy the template
-    await templatesPage.copyTemplate(templateName);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Plan Templates');
+    const templatesPage = new TemplatesPage(benefitsPage);
 
-    // Verify the copy exists (typically with a "Copy of" prefix or similar)
-    await expect(page.locator('table, [class*="template"]')).toBeVisible();
-  });
+    try {
+      const result = await templatesPage.createTemplate();
+      createdName = result.name;
+      evidence.created = true;
 
-  test('TC#13 - Verify that User is able to Create a version on existing Plan Template', async ({ page }) => {
-    // Navigate to Configuration > Plan Templates
-    await templatesPage.navigateToTemplates();
+      await templatesPage.createVersion(result.name);
+      evidence.versioned = true;
+      await captureStep(benefitsPage, testInfo, 'template-versioned');
+    } finally {
+      if (createdName) {
+        await templatesPage.deleteTemplate(createdName).catch(() => null);
+      }
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'version-template-evidence.json', evidence);
+    }
 
-    // Create a template
-    const templateName = generateUniqueName('VersionTemplate');
-    await templatesPage.createTemplate(templateName);
-
-    // Create a version
-    await templatesPage.createVersion(templateName);
-
-    // Verify version was created
-    await expect(page.locator('table, [class*="template"]')).toBeVisible();
+    expect(failedApiResponses(apiResponses), `API errors: ${JSON.stringify(apiResponses)}`).toEqual([]);
   });
 });

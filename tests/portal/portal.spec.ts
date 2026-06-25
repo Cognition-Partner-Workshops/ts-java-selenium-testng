@@ -1,32 +1,48 @@
 import { test, expect } from '@playwright/test';
-import { PortalPage } from '../../pages/PortalPage';
-import { LoginPage } from '../../pages/LoginPage';
+import { USERNAME, PASSWORD } from '../../utils/test-config';
+import { loginToPortal, trackGatewayResponses, captureStep, writeEvidence, ApiResponse } from '../../utils/helpers';
 
-test.describe('Portal Screen - Regression Tests', () => {
-  let portalPage: PortalPage;
+test.describe('Portal Tests', () => {
+  test('TC#1 - Verify Portal Admin permissions and portal home page', async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
 
-  test.beforeEach(async ({ page }) => {
-    portalPage = new PortalPage(page);
-    await page.goto('/portal#/');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = {
+      screen: 'Portal Home',
+      scenario: 'TC#1: Portal Admin Permissions',
+      portalHomeVerified: false,
+    };
+    trackGatewayResponses(page.context(), apiResponses);
+
+    await loginToPortal(page);
+    await expect(page).toHaveURL(/\/portal#\/home$/);
+    await expect(page.getByText('What would you like to work on today?')).toBeVisible();
+    evidence.portalHomeVerified = true;
+    await captureStep(page, testInfo, 'portal-home-verified');
+
+    evidence.apiResponses = apiResponses;
+    await writeEvidence(testInfo, 'portal-admin-evidence.json', evidence);
   });
 
-  test('TC#1 - Portal Admin should be able to add/edit user permissions in User Management', async ({ page }) => {
-    // Navigate to User Management
-    await portalPage.navigateToUserManagement();
+  test('TC#2 - Verify SRP and M3P instances not visible', async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
 
-    // Verify User Management page is accessible
-    await expect(page.getByText('User Management', { exact: false })).toBeVisible();
+    const evidence: Record<string, unknown> = {
+      screen: 'Portal Home',
+      scenario: 'TC#2: SRP/M3P Instance Removal',
+      srpHidden: false,
+      m3pHidden: false,
+    };
 
-    // Verify admin can see user permission controls
-    const addEditControls = page.getByRole('button', { name: /add|edit|save/i });
-    await expect(addEditControls.first()).toBeVisible();
-  });
+    await loginToPortal(page);
+    await expect(page.getByText('SRP', { exact: true })).not.toBeVisible();
+    evidence.srpHidden = true;
+    await expect(page.getByText('M3P', { exact: true })).not.toBeVisible();
+    evidence.m3pHidden = true;
+    await captureStep(page, testInfo, 'srp-m3p-hidden');
 
-  test('TC#2 - SRP and M3P instances not to be presented in Portal for Redbird', async ({ page }) => {
-    // Verify SRP instance is NOT visible
-    await portalPage.verifyNoSRPInstance();
-
-    // Verify M3P instance is NOT visible
-    await portalPage.verifyNoM3PInstance();
+    await writeEvidence(testInfo, 'srp-m3p-removal-evidence.json', evidence);
   });
 });

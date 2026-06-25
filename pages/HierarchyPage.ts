@@ -1,5 +1,5 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { waitForPageLoad, generateUniqueName, waitForSuccessMessage } from '../utils/helpers';
+import { generateUniqueName, readNotificationMessage } from '../utils/helpers';
 
 export class HierarchyPage {
   readonly page: Page;
@@ -8,97 +8,57 @@ export class HierarchyPage {
   readonly addAttributeButton: Locator;
   readonly nameInput: Locator;
   readonly saveButton: Locator;
+  readonly cancelButton: Locator;
   readonly hierarchyTree: Locator;
-  readonly uniqueConstraintCheckbox: Locator;
-  readonly requiredConstraintCheckbox: Locator;
-  readonly displayRuleButton: Locator;
-  readonly ruleInput: Locator;
+  readonly searchBar: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.addCategoryButton = page.getByRole('button', { name: /add category|\+/i }).or(
-      page.locator('[data-testid="add-category"]')
+    this.addCategoryButton = page.getByRole('button', { name: /add category/i }).or(
+      page.locator('button.fa-plus-circle')
     ).first();
-    this.addComponentButton = page.getByRole('button', { name: /add component/i }).or(
-      page.locator('[data-testid="add-component"]')
-    ).first();
-    this.addAttributeButton = page.getByRole('button', { name: /add attribute/i }).or(
-      page.locator('[data-testid="add-attribute"]')
-    ).first();
-    this.nameInput = page.getByLabel(/name/i).or(
-      page.locator('input[name*="name"], input[placeholder*="name" i]')
-    ).first();
-    this.saveButton = page.getByRole('button', { name: /save|submit/i }).first();
-    this.hierarchyTree = page.locator('.hierarchy-tree, .tree-view, [class*="hierarchy"]').first();
-    this.uniqueConstraintCheckbox = page.getByLabel(/unique/i).or(
-      page.locator('input[type="checkbox"][name*="unique"]')
-    ).first();
-    this.requiredConstraintCheckbox = page.getByLabel(/required/i).or(
-      page.locator('input[type="checkbox"][name*="required"]')
-    ).first();
-    this.displayRuleButton = page.getByRole('button', { name: /display rule/i }).or(
-      page.locator('[data-testid="display-rule"]')
-    ).first();
-    this.ruleInput = page.getByLabel(/rule/i).or(
-      page.locator('input[name*="rule"], textarea[name*="rule"]')
-    ).first();
+    this.addComponentButton = page.getByRole('button', { name: /add component/i }).first();
+    this.addAttributeButton = page.getByRole('button', { name: /add attribute/i }).first();
+    this.nameInput = page.locator('#name').or(page.locator('input[name="name"]')).first();
+    this.saveButton = page.getByRole('button', { name: /^Save$/i });
+    this.cancelButton = page.locator('#btnCancel').or(page.getByRole('button', { name: /Cancel/i })).first();
+    this.hierarchyTree = page.locator('.tree, [class*="hierarchy"], [class*="tree"]').first();
+    this.searchBar = page.locator('#search-bar-0');
   }
 
-  async navigateToHierarchy(): Promise<void> {
-    await this.page.getByText('Configuration', { exact: false }).first().click();
-    await this.page.getByText('Benefit Hierarchy', { exact: false }).or(
-      this.page.locator('a[href*="hierarchy"]')
-    ).first().click();
-    await waitForPageLoad(this.page);
-  }
-
-  async createCategory(categoryName?: string): Promise<string> {
-    const name = categoryName || generateUniqueName('Category');
+  async createCategory(name?: string): Promise<string> {
+    const categoryName = name || generateUniqueName('Category');
     await this.addCategoryButton.click();
-    await this.nameInput.fill(name);
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.fill(categoryName);
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
-    return name;
+    await this.page.waitForTimeout(1000);
+    return categoryName;
   }
 
-  async createComponent(componentName?: string): Promise<string> {
-    const name = componentName || generateUniqueName('Component');
+  async createComponent(parentCategory: string, name?: string): Promise<string> {
+    const componentName = name || generateUniqueName('Component');
+    await this.page.getByText(parentCategory).first().click();
     await this.addComponentButton.click();
-    await this.nameInput.fill(name);
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.fill(componentName);
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
-    return name;
+    await this.page.waitForTimeout(1000);
+    return componentName;
   }
 
-  async createAttribute(attributeName?: string): Promise<string> {
-    const name = attributeName || generateUniqueName('Attribute');
+  async createAttribute(parentComponent: string, name?: string): Promise<string> {
+    const attributeName = name || generateUniqueName('Attribute');
+    await this.page.getByText(parentComponent).first().click();
     await this.addAttributeButton.click();
-    await this.nameInput.fill(name);
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.fill(attributeName);
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
-    return name;
+    await this.page.waitForTimeout(1000);
+    return attributeName;
   }
 
-  async addUniqueConstraint(): Promise<void> {
-    await this.uniqueConstraintCheckbox.check();
-    await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
-  }
-
-  async addRequiredConstraint(): Promise<void> {
-    await this.requiredConstraintCheckbox.check();
-    await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
-  }
-
-  async addDisplayRule(rule: string): Promise<void> {
-    await this.displayRuleButton.click();
-    await this.ruleInput.fill(rule);
-    await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
-  }
-
-  async verifyHierarchyCreated(): Promise<void> {
-    await expect(this.hierarchyTree).toBeVisible();
+  async verifyHierarchyNodeExists(nodeName: string): Promise<void> {
+    await expect(this.page.getByText(nodeName)).toBeVisible();
   }
 }

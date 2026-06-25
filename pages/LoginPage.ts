@@ -1,43 +1,52 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { config } from '../utils/test-config';
+import { APP_URL } from '../utils/test-config';
 
 export class LoginPage {
   readonly page: Page;
+  readonly signInHeading: Locator;
   readonly usernameInput: Locator;
   readonly passwordInput: Locator;
   readonly loginButton: Locator;
-  readonly errorMessage: Locator;
+  readonly welcomeMessage: Locator;
+  readonly profileDropdown: Locator;
+  readonly logoutMenuItem: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.usernameInput = page.locator('input[type="text"], input[name="username"], input[placeholder*="user" i]').first();
-    this.passwordInput = page.locator('input[type="password"]').first();
-    this.loginButton = page.getByRole('button', { name: /login|sign in|submit/i }).or(
-      page.locator('button[type="submit"]')
-    ).first();
-    this.errorMessage = page.locator('.error-message, .alert-danger, [class*="error"]').first();
+    this.signInHeading = page.getByRole('heading', { name: 'Sign In' });
+    this.usernameInput = page.getByRole('textbox', { name: 'Username' });
+    this.passwordInput = page.getByRole('textbox', { name: 'Password' });
+    this.loginButton = page.getByRole('button', { name: /Login/i });
+    this.welcomeMessage = page.getByText('What would you like to work on today?');
+    this.profileDropdown = page.locator('#dropdown-size-small');
+    this.logoutMenuItem = page.getByRole('menuitem', { name: /Log Out/i });
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(config.portalUrl);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+    await expect(this.signInHeading).toBeVisible();
   }
 
-  async login(username?: string, password?: string): Promise<void> {
-    const user = username || config.credentials.username;
-    const pass = password || config.credentials.password;
-
-    await this.usernameInput.fill(user);
-    await this.passwordInput.fill(pass);
+  async login(username: string, password: string): Promise<void> {
+    await this.usernameInput.fill(username);
+    await this.passwordInput.fill(password);
     await this.loginButton.click();
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForURL(/\/portal#\/home$/, { timeout: 30_000 });
+    await expect(this.welcomeMessage).toBeVisible();
   }
 
-  async verifyLoginSuccess(): Promise<void> {
-    await expect(this.page).not.toHaveURL(/login/i, { timeout: 30000 });
+  async logout(): Promise<void> {
+    await this.profileDropdown.click();
+    await this.logoutMenuItem.click();
+    await this.page.waitForURL(/\/portal#\/$/, { timeout: 15_000 });
+    await expect(this.signInHeading).toBeVisible();
+    await expect(this.usernameInput).toBeVisible();
   }
 
-  async verifyLoginError(): Promise<void> {
-    await expect(this.errorMessage).toBeVisible();
+  async verifyLoginPage(): Promise<void> {
+    await expect(this.signInHeading).toBeVisible();
+    await expect(this.usernameInput).toBeVisible();
+    await expect(this.passwordInput).toBeVisible();
+    await expect(this.loginButton).toBeVisible();
   }
 }

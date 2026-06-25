@@ -1,52 +1,53 @@
 import { test, expect } from '@playwright/test';
-import { PortalPage } from '../../pages/PortalPage';
+import { USERNAME, PASSWORD } from '../../utils/test-config';
+import { loginToPortal, openBenefitsManagement, openConfigurationScreen, trackGatewayResponses, captureStep, writeEvidence, failedApiResponses, ApiResponse } from '../../utils/helpers';
 import { ReportConfigurationPage } from '../../pages/ReportConfigurationPage';
 
-test.describe('Report Configuration - Regression Tests', () => {
-  let portalPage: PortalPage;
-  let reportPage: ReportConfigurationPage;
-
-  test.beforeEach(async ({ page }) => {
-    portalPage = new PortalPage(page);
-    reportPage = new ReportConfigurationPage(page);
-    await page.goto('/portal#/');
-    await portalPage.clickBenefitsManagement();
+test.describe('Report Configuration Tests', () => {
+  test('TC#67 - Create a report configuration', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#67: Create Report Config', created: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Report Configuration');
+    const reportPage = new ReportConfigurationPage(benefitsPage);
+    try {
+      const result = await reportPage.createReportConfig();
+      evidence.reportName = result.name;
+      evidence.saveMessage = result.message;
+      evidence.created = true;
+      await captureStep(benefitsPage, testInfo, 'report-config-created');
+      await reportPage.verifyReportExists(result.name);
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'create-report-config-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 
-  test('TC#67 - Verify user can add report configuration with specific attributes', async ({ page }) => {
-    // Navigate to Report Configuration
-    await reportPage.navigateToReportConfiguration();
-
-    // Click on Manage Consumers
-    await reportPage.manageConsumersButton.click();
-
-    // Add Consumer
-    await reportPage.addConsumerButton.click();
-
-    // Select Report type
-    await expect(reportPage.reportTypeDropdown).toBeVisible();
-
-    // Select Format
-    await expect(reportPage.formatDropdown).toBeVisible();
-
-    // Add Attributes
-    await expect(reportPage.addAttributeButton).toBeVisible();
-
-    // Save
-    await reportPage.saveButton.click();
-  });
-
-  test('TC#68 - Verify user can add/remove attributes for existing report configuration', async ({ page }) => {
-    // Navigate to Report Configuration
-    await reportPage.navigateToReportConfiguration();
-
-    // Select an existing report type
-    await expect(reportPage.reportTypeDropdown).toBeVisible();
-
-    // Verify Add attribute button is available
-    await expect(reportPage.addAttributeButton).toBeVisible();
-
-    // Verify Remove attribute button is available
-    await expect(reportPage.removeAttributeButton).toBeVisible();
+  test('TC#68 - Edit a report configuration', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(!USERNAME || !PASSWORD, 'Set GXCAPTURE_USERNAME and GXCAPTURE_PASSWORD before running.');
+    const apiResponses: ApiResponse[] = [];
+    const evidence: Record<string, unknown> = { scenario: 'TC#68: Edit Report Config', edited: false };
+    trackGatewayResponses(page.context(), apiResponses);
+    await loginToPortal(page);
+    const benefitsPage = await openBenefitsManagement(page);
+    await openConfigurationScreen(benefitsPage, 'Report Configuration');
+    const reportPage = new ReportConfigurationPage(benefitsPage);
+    try {
+      const result = await reportPage.createReportConfig();
+      const editMsg = await reportPage.editReportConfig(result.name, `${result.name}_Edited`);
+      evidence.editMessage = editMsg;
+      evidence.edited = true;
+      await captureStep(benefitsPage, testInfo, 'report-config-edited');
+    } finally {
+      evidence.apiResponses = apiResponses;
+      await writeEvidence(testInfo, 'edit-report-config-evidence.json', evidence);
+    }
+    expect(failedApiResponses(apiResponses)).toEqual([]);
   });
 });

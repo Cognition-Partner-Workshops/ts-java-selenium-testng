@@ -1,31 +1,37 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { waitForPageLoad } from '../utils/helpers';
+import { portalUrl } from '../utils/test-config';
 
 export class PortalPage {
   readonly page: Page;
-  readonly userManagementLink: Locator;
-  readonly benefitsManagementInstance: Locator;
-  readonly instanceCards: Locator;
+  readonly gxClientLink: Locator;
+  readonly benefitsManagementCard: Locator;
+  readonly welcomeMessage: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.userManagementLink = page.getByText('User Management', { exact: false }).or(
-      page.locator('[data-testid="user-management"], a[href*="user-management"]')
-    ).first();
-    this.benefitsManagementInstance = page.getByText('Benefits Management', { exact: false }).or(
-      page.locator('[data-testid="benefits-management"]')
-    ).first();
-    this.instanceCards = page.locator('.instance-card, .portal-card, [class*="instance"]');
+    this.gxClientLink = page.getByRole('link', { name: 'Gx Client' });
+    this.benefitsManagementCard = page.getByText('Benefits Management', { exact: false }).first();
+    this.welcomeMessage = page.getByText('What would you like to work on today?');
+  }
+
+  async goto(): Promise<void> {
+    await this.page.goto(portalUrl('/portal#/home'), { waitUntil: 'domcontentloaded', timeout: 45_000 });
+    await this.page.waitForURL(/\/portal#\/home$/, { timeout: 15_000 });
   }
 
   async navigateToUserManagement(): Promise<void> {
-    await this.userManagementLink.click();
-    await waitForPageLoad(this.page);
+    await this.gxClientLink.click();
+    await this.page.waitForURL(/\/portal#\/manageUser$/, { timeout: 15_000 });
+    await expect(this.page.getByRole('heading', { name: /Manage Users/i })).toBeVisible();
   }
 
-  async clickBenefitsManagement(): Promise<void> {
-    await this.benefitsManagementInstance.click();
-    await waitForPageLoad(this.page);
+  async clickBenefitsManagement(): Promise<Page> {
+    const [benefitsPage] = await Promise.all([
+      this.page.context().waitForEvent('page', { timeout: 30_000 }).catch(() => this.page),
+      this.benefitsManagementCard.click(),
+    ]);
+    await benefitsPage.waitForLoadState('domcontentloaded');
+    return benefitsPage;
   }
 
   async verifyNoSRPInstance(): Promise<void> {
@@ -36,7 +42,7 @@ export class PortalPage {
     await expect(this.page.getByText('M3P', { exact: true })).not.toBeVisible();
   }
 
-  async verifyUserManagementAccessible(): Promise<void> {
-    await expect(this.userManagementLink).toBeVisible();
+  async verifyPortalHome(): Promise<void> {
+    await expect(this.welcomeMessage).toBeVisible();
   }
 }

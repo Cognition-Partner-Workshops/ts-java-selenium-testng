@@ -1,172 +1,177 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { waitForPageLoad, generateUniqueName, waitForSuccessMessage } from '../utils/helpers';
+import { generateUniqueName, readNotificationMessage } from '../utils/helpers';
 
 export class PlansPage {
   readonly page: Page;
-  readonly addPlanButton: Locator;
-  readonly planNameInput: Locator;
+  readonly addButton: Locator;
   readonly saveButton: Locator;
-  readonly planList: Locator;
-  readonly editButton: Locator;
-  readonly copyButton: Locator;
+  readonly planTable: Locator;
+  readonly searchBar: Locator;
   readonly deleteButton: Locator;
-  readonly versionButton: Locator;
-  readonly massStatusUpdateButton: Locator;
-  readonly advanceSearchButton: Locator;
-  readonly searchInput: Locator;
-  readonly contextFilter: Locator;
-  readonly statusFilters: {
-    open: Locator;
-    reviewPending: Locator;
-    approved: Locator;
-    rejected: Locator;
-    published: Locator;
-  };
   readonly exportButton: Locator;
-  readonly planCheckbox: Locator;
+  readonly massStatusButton: Locator;
+  readonly advanceSearchButton: Locator;
+  readonly contextFilter: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.addPlanButton = page.getByRole('button', { name: /add|create|\+/i }).or(
-      page.locator('[data-testid="add-plan"]')
+    this.addButton = page.locator('button.fa-plus-circle').or(
+      page.getByRole('button', { name: /add|\+/i })
     ).first();
-    this.planNameInput = page.getByLabel(/plan name|name/i).or(
-      page.locator('input[name*="plan"], input[placeholder*="plan" i]')
+    this.saveButton = page.getByRole('button', { name: /^Save$/i });
+    this.planTable = page.locator('table').first();
+    this.searchBar = page.locator('#search-bar-0');
+    this.deleteButton = page.locator('button.tableRowDelete').or(
+      page.getByRole('button', { name: /delete/i })
     ).first();
-    this.saveButton = page.getByRole('button', { name: /save|submit/i }).first();
-    this.planList = page.locator('.plan-list, table, [class*="plan-list"]').first();
-    this.editButton = page.locator('[title*="edit" i], .edit-icon').first();
-    this.copyButton = page.locator('[title*="copy" i], .copy-icon').first();
-    this.deleteButton = page.getByRole('button', { name: /delete/i }).or(
-      page.locator('[data-testid="delete-plan"]')
-    ).first();
-    this.versionButton = page.locator('[title*="version" i], button:has-text("Add New Version")').first();
-    this.massStatusUpdateButton = page.getByRole('button', { name: /mass status|bulk update/i }).first();
-    this.advanceSearchButton = page.getByRole('button', { name: /advance search|advanced/i }).or(
-      page.locator('[data-testid="advance-search"]')
-    ).first();
-    this.searchInput = page.locator('input[type="search"], input[placeholder*="search" i]').first();
-    this.contextFilter = page.locator('select[name*="context"], [data-testid="context-filter"]').first();
-    this.statusFilters = {
-      open: page.getByText('OPEN', { exact: true }).or(page.locator('[data-status="open"]')).first(),
-      reviewPending: page.getByText('REVIEW PENDING', { exact: false }).or(page.locator('[data-status="review-pending"]')).first(),
-      approved: page.getByText('APPROVED', { exact: true }).or(page.locator('[data-status="approved"]')).first(),
-      rejected: page.getByText('REJECTED', { exact: true }).or(page.locator('[data-status="rejected"]')).first(),
-      published: page.getByText('PUBLISHED', { exact: true }).or(page.locator('[data-status="published"]')).first(),
-    };
     this.exportButton = page.getByRole('button', { name: /export/i }).first();
-    this.planCheckbox = page.locator('input[type="checkbox"]').first();
+    this.massStatusButton = page.getByRole('button', { name: /mass status|bulk/i }).first();
+    this.advanceSearchButton = page.getByRole('button', { name: /advance|advanced/i }).first();
+    this.contextFilter = page.locator('select[name*="context"], #contextFilter').first();
   }
 
-  async navigateToPlans(): Promise<void> {
-    await this.page.getByText('Plans', { exact: false }).or(
-      this.page.locator('a[href*="plans"]')
-    ).first().click();
-    await waitForPageLoad(this.page);
+  async searchPlans(name: string): Promise<void> {
+    await this.searchBar.click();
+    await this.searchBar.press('Control+A');
+    await this.searchBar.press('Backspace');
+    await this.searchBar.pressSequentially(name, { delay: 10 });
+    await this.searchBar.press('Enter');
+    await this.page.waitForTimeout(500);
   }
 
-  async createPlan(planName?: string): Promise<string> {
+  async planRows(): Promise<string[][]> {
+    return this.planTable.locator('tbody tr').evaluateAll((rows) =>
+      rows.map((row) => [...(row as HTMLTableRowElement).cells].map((cell) => cell.textContent?.trim() || ''))
+    );
+  }
+
+  async createPlan(planName?: string): Promise<{ name: string; message: string }> {
     const name = planName || generateUniqueName('Plan');
-    await this.addPlanButton.click();
-    await this.planNameInput.fill(name);
+    await this.addButton.click();
+    await this.page.waitForLoadState('domcontentloaded');
+    const nameInput = this.page.locator('#name, #planName, input[name="name"]').first();
+    if (await nameInput.isVisible().catch(() => false)) {
+      await nameInput.fill(name);
+    }
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
-    return name;
+    const message = await readNotificationMessage(this.page);
+    return { name, message };
   }
 
   async editPlan(planName: string): Promise<void> {
-    const row = this.page.locator(`tr:has-text("${planName}"), [class*="row"]:has-text("${planName}")`).first();
-    await row.locator('[title*="edit" i], .edit-icon').first().click();
-    await waitForPageLoad(this.page);
+    await this.searchPlans(planName);
+    const row = this.planTable.locator('tbody tr').filter({ hasText: planName }).first();
+    await row.locator('button.edit, [title*="edit" i]').first().click();
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
-  async copyPlan(planName: string): Promise<void> {
-    const row = this.page.locator(`tr:has-text("${planName}"), [class*="row"]:has-text("${planName}")`).first();
-    await row.locator('[title*="copy" i], .copy-icon').first().click();
+  async copyPlan(planName: string): Promise<string> {
+    await this.searchPlans(planName);
+    const row = this.planTable.locator('tbody tr').filter({ hasText: planName }).first();
+    await row.locator('button.copy, [title*="copy" i]').first().click();
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
+    return readNotificationMessage(this.page);
   }
 
-  async createNewVersion(planName: string): Promise<void> {
-    const row = this.page.locator(`tr:has-text("${planName}"), [class*="row"]:has-text("${planName}")`).first();
-    await row.locator('[title*="version" i], button:has-text("Add New Version")').first().click();
+  async createNewVersion(planName: string): Promise<string> {
+    await this.searchPlans(planName);
+    const row = this.planTable.locator('tbody tr').filter({ hasText: planName }).first();
+    await row.locator('button.version, [title*="version" i]').first().click();
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
+    return readNotificationMessage(this.page);
   }
 
   async deletePlan(planName: string): Promise<void> {
-    const row = this.page.locator(`tr:has-text("${planName}"), [class*="row"]:has-text("${planName}")`).first();
-    await row.locator('input[type="checkbox"]').first().check();
+    await this.searchPlans(planName);
+    const row = this.planTable.locator('tbody tr').filter({ hasText: planName }).first();
+    await row.locator('input[type="checkbox"], input.selection-input-4').first().check();
+    const dialogPromise = this.page.waitForEvent('dialog', { timeout: 2_000 })
+      .then(async (dialog) => { await dialog.accept(); return dialog.message(); })
+      .catch(() => '');
     await this.deleteButton.click();
-    // Confirm deletion dialog
-    await this.page.getByRole('button', { name: /confirm|yes|ok/i }).first().click();
-    await waitForSuccessMessage(this.page);
+    await dialogPromise;
+    const confirmBtn = this.page.getByRole('button', { name: /^(Yes|OK|Confirm|Delete)$/i }).last();
+    if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await confirmBtn.click();
+    }
+    await this.page.waitForTimeout(1000);
   }
 
-  async filterByStatus(status: 'open' | 'reviewPending' | 'approved' | 'rejected' | 'published'): Promise<void> {
-    await this.statusFilters[status].click();
-    await waitForPageLoad(this.page);
+  async filterByStatus(status: string): Promise<void> {
+    await this.page.getByText(status, { exact: true }).first().click();
+    await this.page.waitForTimeout(500);
   }
 
   async filterByContext(contextName: string): Promise<void> {
     await this.contextFilter.selectOption(contextName);
-    await waitForPageLoad(this.page);
+    await this.page.waitForTimeout(500);
   }
 
   async advanceSearch(searchTerm: string): Promise<void> {
     await this.advanceSearchButton.click();
-    await this.searchInput.fill(searchTerm);
+    const searchInput = this.page.locator('input[type="search"], input[placeholder*="search" i]').first();
+    await searchInput.fill(searchTerm);
     await this.page.getByRole('button', { name: /search|apply/i }).first().click();
-    await waitForPageLoad(this.page);
+    await this.page.waitForTimeout(500);
   }
 
-  async massStatusUpdate(): Promise<void> {
-    await this.massStatusUpdateButton.click();
-    await waitForPageLoad(this.page);
+  async submitForReview(): Promise<string> {
+    await this.page.getByRole('button', { name: /submit for review/i }).first().click();
+    const commentInput = this.page.locator('textarea, input[name*="comment"]').first();
+    if (await commentInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await commentInput.fill('Automated test - submit for review');
+      await this.page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
+    }
+    return readNotificationMessage(this.page);
   }
 
-  async verifyPlanExists(planName: string): Promise<void> {
-    await expect(this.page.getByText(planName)).toBeVisible();
+  async approve(): Promise<string> {
+    await this.page.getByRole('button', { name: /approve/i }).first().click();
+    const commentInput = this.page.locator('textarea, input[name*="comment"]').first();
+    if (await commentInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await commentInput.fill('Automated test - approved');
+      await this.page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
+    }
+    return readNotificationMessage(this.page);
   }
 
-  async verifyPlanNotVisible(planName: string): Promise<void> {
-    await expect(this.page.getByText(planName)).not.toBeVisible();
+  async publish(): Promise<string> {
+    await this.page.getByRole('button', { name: /publish/i }).first().click();
+    const commentInput = this.page.locator('textarea, input[name*="comment"]').first();
+    if (await commentInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await commentInput.fill('Automated test - published');
+      await this.page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
+    }
+    return readNotificationMessage(this.page);
+  }
+
+  async reject(): Promise<string> {
+    await this.page.getByRole('button', { name: /reject/i }).first().click();
+    const commentInput = this.page.locator('textarea, input[name*="comment"]').first();
+    if (await commentInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await commentInput.fill('Automated test - rejected');
+      await this.page.getByRole('button', { name: /submit|confirm|ok/i }).first().click();
+    }
+    return readNotificationMessage(this.page);
   }
 
   async getStatusDot(planName: string): Promise<Locator> {
-    const row = this.page.locator(`tr:has-text("${planName}"), [class*="row"]:has-text("${planName}")`).first();
+    const row = this.planTable.locator('tbody tr').filter({ hasText: planName }).first();
     return row.locator('.status-dot, [class*="status"], .dot').first();
   }
 
-  async submitForReview(planName: string): Promise<void> {
-    await this.editPlan(planName);
-    await this.page.getByRole('button', { name: /submit for review/i }).first().click();
-    await waitForSuccessMessage(this.page);
-  }
-
-  async approvePlan(planName: string): Promise<void> {
-    await this.editPlan(planName);
-    await this.page.getByRole('button', { name: /approve/i }).first().click();
-    await waitForSuccessMessage(this.page);
-  }
-
-  async publishPlan(planName: string): Promise<void> {
-    await this.editPlan(planName);
-    await this.page.getByRole('button', { name: /publish/i }).first().click();
-    await waitForSuccessMessage(this.page);
-  }
-
-  async rejectPlan(planName: string): Promise<void> {
-    await this.editPlan(planName);
-    await this.page.getByRole('button', { name: /reject/i }).first().click();
-    await waitForSuccessMessage(this.page);
+  async massStatusUpdate(): Promise<void> {
+    await this.massStatusButton.click();
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   async exportPlans(format: string): Promise<void> {
-    await this.planCheckbox.check();
     await this.exportButton.click();
     await this.page.getByText(format, { exact: false }).first().click();
-    await this.page.getByRole('button', { name: /proceed|export|download/i }).first().click();
-    await waitForPageLoad(this.page);
+    const proceedBtn = this.page.getByRole('button', { name: /proceed|export|download/i }).first();
+    if (await proceedBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await proceedBtn.click();
+    }
+    await this.page.waitForTimeout(2000);
   }
 }

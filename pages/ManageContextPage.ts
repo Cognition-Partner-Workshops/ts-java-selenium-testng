@@ -1,49 +1,47 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { waitForPageLoad, generateUniqueName, waitForSuccessMessage } from '../utils/helpers';
+import { generateUniqueName, readNotificationMessage, searchTable } from '../utils/helpers';
 
 export class ManageContextPage {
   readonly page: Page;
-  readonly addContextButton: Locator;
-  readonly contextNameInput: Locator;
+  readonly addButton: Locator;
+  readonly nameInput: Locator;
   readonly saveButton: Locator;
-  readonly contextList: Locator;
+  readonly contextTable: Locator;
+  readonly cancelButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.addContextButton = page.getByRole('button', { name: /\+|add/i }).or(
-      page.locator('[data-testid="add-context"], button[title*="add" i]')
+    this.addButton = page.locator('button.fa-plus-circle').or(
+      page.getByRole('button', { name: /add|\+/i })
     ).first();
-    this.contextNameInput = page.getByLabel(/context name|name/i).or(
-      page.locator('input[name*="context"], input[placeholder*="context" i]')
+    this.nameInput = page.locator('#name').or(
+      page.locator('input[name*="name"]')
     ).first();
-    this.saveButton = page.getByRole('button', { name: /save|submit/i }).first();
-    this.contextList = page.locator('.context-list, table, [class*="context"]').first();
-  }
-
-  async navigateToManageContext(): Promise<void> {
-    await this.page.getByText('Admin', { exact: false }).first().click();
-    await this.page.getByText('Manage context', { exact: false }).or(
-      this.page.locator('a[href*="context"]')
-    ).first().click();
-    await waitForPageLoad(this.page);
+    this.saveButton = page.getByRole('button', { name: /^Save$/i });
+    this.contextTable = page.locator('table').first();
+    this.cancelButton = page.locator('#btnCancel').or(
+      page.getByRole('button', { name: /Cancel/i })
+    ).first();
   }
 
   async addNewContext(contextName?: string): Promise<string> {
     const name = contextName || generateUniqueName('Context');
-    await this.addContextButton.click();
-    await this.contextNameInput.fill(name);
+    await this.addButton.click();
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.fill(name);
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
+    await this.page.waitForTimeout(1000);
     return name;
   }
 
   async editContext(contextName: string, newName: string): Promise<void> {
-    const row = this.page.locator(`tr:has-text("${contextName}"), [class*="row"]:has-text("${contextName}")`).first();
-    await row.locator('[title*="edit" i], .edit-icon, button:has-text("Edit")').first().click();
-    await this.contextNameInput.clear();
-    await this.contextNameInput.fill(newName);
+    const row = this.contextTable.locator('tbody tr').filter({ hasText: contextName }).first();
+    await row.locator('button.edit').or(row.locator('[title*="edit" i]')).first().click();
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.clear();
+    await this.nameInput.fill(newName);
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
+    await this.page.waitForTimeout(1000);
   }
 
   async verifyContextExists(contextName: string): Promise<void> {

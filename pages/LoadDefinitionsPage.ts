@@ -1,123 +1,111 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { waitForPageLoad, generateUniqueName, waitForSuccessMessage } from '../utils/helpers';
+import { generateUniqueName, readNotificationMessage, visibleValidationMessages } from '../utils/helpers';
 
 export class LoadDefinitionsPage {
   readonly page: Page;
-  readonly addLoadDefinitionButton: Locator;
-  readonly loadDefinitionNameInput: Locator;
-  readonly sourceTypeDropdown: Locator;
+  readonly addButton: Locator;
+  readonly nameInput: Locator;
   readonly saveButton: Locator;
-  readonly runLoadButton: Locator;
-  readonly chooseFileButton: Locator;
-  readonly contextDropdown: Locator;
-  readonly templateDropdown: Locator;
-  readonly modeDropdown: Locator;
-  readonly versionNameInput: Locator;
-  readonly versionNotesInput: Locator;
-  readonly loadDefinitionCheckbox: Locator;
-  readonly planLoadStatusLink: Locator;
-  readonly batchIdColumn: Locator;
+  readonly cancelButton: Locator;
+  readonly loadTable: Locator;
+  readonly searchBar: Locator;
+  readonly runButton: Locator;
   readonly statusColumn: Locator;
-  readonly errorDescription: Locator;
+  readonly batchProcessButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.addLoadDefinitionButton = page.getByRole('button', { name: /\+|add|create/i }).or(
-      page.locator('[data-testid="add-load-definition"]')
+    this.addButton = page.locator('button.fa-plus-circle').or(
+      page.getByRole('button', { name: /add|\+/i })
     ).first();
-    this.loadDefinitionNameInput = page.getByLabel(/name/i).or(
-      page.locator('input[name*="name"], input[placeholder*="name" i]')
-    ).first();
-    this.sourceTypeDropdown = page.getByLabel(/source type/i).or(
-      page.locator('select[name*="source"]')
-    ).first();
-    this.saveButton = page.getByRole('button', { name: /save|submit/i }).first();
-    this.runLoadButton = page.getByRole('button', { name: /run load/i }).first();
-    this.chooseFileButton = page.getByRole('button', { name: /choose file|browse/i }).or(
-      page.locator('input[type="file"]')
-    ).first();
-    this.contextDropdown = page.getByLabel(/context/i).or(
-      page.locator('select[name*="context"]')
-    ).first();
-    this.templateDropdown = page.getByLabel(/template/i).or(
-      page.locator('select[name*="template"]')
-    ).first();
-    this.modeDropdown = page.getByLabel(/mode|select mode/i).or(
-      page.locator('select[name*="mode"]')
-    ).first();
-    this.versionNameInput = page.getByLabel(/version name/i).or(
-      page.locator('input[name*="version"]')
-    ).first();
-    this.versionNotesInput = page.getByLabel(/version notes|notes/i).or(
-      page.locator('textarea[name*="notes"]')
-    ).first();
-    this.loadDefinitionCheckbox = page.locator('input[type="checkbox"]').first();
-    this.planLoadStatusLink = page.getByText('Plan load status', { exact: false }).or(
-      page.locator('a[href*="load-status"]')
-    ).first();
-    this.batchIdColumn = page.locator('td:nth-child(1), [data-field="batchId"]');
-    this.statusColumn = page.locator('[data-field="status"], td:has-text("Success"), td:has-text("Failed")');
-    this.errorDescription = page.locator('[data-field="error"], .error-description, td:has-text("Invalid")');
+    this.nameInput = page.locator('#name').or(page.locator('input[name="name"]')).first();
+    this.saveButton = page.getByRole('button', { name: /^Save$/i });
+    this.cancelButton = page.locator('#btnCancel').or(page.getByRole('button', { name: /Cancel/i })).first();
+    this.loadTable = page.locator('table').first();
+    this.searchBar = page.locator('#search-bar-0');
+    this.runButton = page.getByRole('button', { name: /run|execute/i }).first();
+    this.statusColumn = page.locator('td[class*="status"], td:nth-child(4)');
+    this.batchProcessButton = page.getByRole('button', { name: /batch|process/i }).first();
   }
 
-  async navigateToLoadDefinitions(): Promise<void> {
-    await this.page.getByText('Configuration', { exact: false }).first().click();
-    await this.page.getByText('Load definition', { exact: false }).or(
-      this.page.locator('a[href*="load-definition"]')
-    ).first().click();
-    await waitForPageLoad(this.page);
+  async searchLoadDefinitions(name: string): Promise<void> {
+    await this.searchBar.click();
+    await this.searchBar.press('Control+A');
+    await this.searchBar.press('Backspace');
+    await this.searchBar.pressSequentially(name, { delay: 10 });
+    await this.searchBar.press('Enter');
+    await this.page.waitForTimeout(500);
   }
 
-  async createLoadDefinition(name?: string): Promise<string> {
-    const defName = name || generateUniqueName('LoadDef');
-    await this.addLoadDefinitionButton.click();
-    await this.loadDefinitionNameInput.fill(defName);
-    await this.sourceTypeDropdown.selectOption('Excel');
+  async loadDefinitionRows(): Promise<string[][]> {
+    return this.loadTable.locator('tbody tr').evaluateAll((rows) =>
+      rows.map((row) => [...(row as HTMLTableRowElement).cells].map((cell) => cell.textContent?.trim() || ''))
+    );
+  }
+
+  async createLoadDefinition(name?: string): Promise<{ name: string; message: string }> {
+    const loadName = name || generateUniqueName('Load');
+    await this.addButton.click();
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.fill(loadName);
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
-    return defName;
+    const message = await readNotificationMessage(this.page);
+    return { name: loadName, message };
   }
 
-  async runLoad(options: {
-    filePath: string;
-    context: string;
-    template: string;
-    mode: 'Add/replace' | 'Update';
-    versionName?: string;
-    versionNotes?: string;
-  }): Promise<void> {
-    await this.loadDefinitionCheckbox.check();
-    await this.runLoadButton.click();
-    await this.chooseFileButton.setInputFiles(options.filePath);
-    await this.contextDropdown.selectOption(options.context);
-    await this.templateDropdown.selectOption(options.template);
-    await this.modeDropdown.selectOption(options.mode);
-    if (options.versionName) {
-      await this.versionNameInput.fill(options.versionName);
+  async openEditForm(name: string): Promise<void> {
+    await this.searchLoadDefinitions(name);
+    const row = this.loadTable.locator('tbody tr').filter({ hasText: name }).first();
+    await row.locator('button.edit, [title*="edit" i]').first().click();
+    await expect(this.nameInput).toBeVisible();
+  }
+
+  async deleteLoadDefinition(name: string): Promise<{ deleted: boolean }> {
+    await this.searchLoadDefinitions(name);
+    const row = this.loadTable.locator('tbody tr').filter({ hasText: name }).first();
+    if (!(await row.isVisible().catch(() => false))) {
+      return { deleted: false };
     }
-    if (options.versionNotes) {
-      await this.versionNotesInput.fill(options.versionNotes);
+    await row.locator('input[type="checkbox"]').first().check();
+    const deleteButton = this.page.locator('button.tableRowDelete').or(
+      this.page.getByRole('button', { name: /delete/i })
+    ).first();
+    const dialogPromise = this.page.waitForEvent('dialog', { timeout: 2_000 })
+      .then(async (dialog) => { await dialog.accept(); return dialog.message(); })
+      .catch(() => '');
+    await deleteButton.click();
+    await dialogPromise;
+    const confirmBtn = this.page.getByRole('button', { name: /^(Yes|OK|Confirm|Delete)$/i }).last();
+    if (await confirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await confirmBtn.click();
     }
-    await this.saveButton.click();
-    await waitForPageLoad(this.page);
+    await this.page.waitForTimeout(1000);
+    return { deleted: true };
   }
 
-  async navigateToPlanLoadStatus(): Promise<void> {
-    await this.planLoadStatusLink.click();
-    await waitForPageLoad(this.page);
+  async verifyValidationMessages(): Promise<string[]> {
+    return visibleValidationMessages(this.page);
   }
 
-  async verifyBatchIdPresent(): Promise<void> {
-    await expect(this.batchIdColumn.first()).toBeVisible();
-    const text = await this.batchIdColumn.first().textContent();
-    expect(text).toBeTruthy();
+  async runLoadDefinition(name: string): Promise<string> {
+    await this.searchLoadDefinitions(name);
+    const row = this.loadTable.locator('tbody tr').filter({ hasText: name }).first();
+    await row.locator('button.run, [title*="run" i], button.fa-play').first().click();
+    return readNotificationMessage(this.page);
   }
 
-  async verifyLoadStatus(expectedStatus: 'Success' | 'Failed'): Promise<void> {
-    await expect(this.page.getByText(expectedStatus, { exact: false }).first()).toBeVisible();
+  async batchProcess(): Promise<string> {
+    await this.batchProcessButton.click();
+    return readNotificationMessage(this.page);
   }
 
-  async verifyErrorMessage(expectedError: string): Promise<void> {
-    await expect(this.page.getByText(expectedError, { exact: false }).first()).toBeVisible();
+  async waitForLoadDefinitionRow(name: string): Promise<string[] | undefined> {
+    await this.searchLoadDefinitions(name);
+    await expect.poll(async () => {
+      const rows = await this.loadDefinitionRows();
+      return rows.some((row) => row.some((cell) => cell.includes(name)));
+    }, { message: `Load definition "${name}" should be visible`, timeout: 15_000 }).toBe(true);
+    const rows = await this.loadDefinitionRows();
+    return rows.find((row) => row.some((cell) => cell.includes(name)));
   }
 }

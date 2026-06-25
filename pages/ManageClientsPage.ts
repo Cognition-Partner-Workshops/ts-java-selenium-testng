@@ -1,57 +1,56 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { waitForPageLoad, generateUniqueName, waitForSuccessMessage } from '../utils/helpers';
+import { generateUniqueName, readNotificationMessage, searchTable } from '../utils/helpers';
 
 export class ManageClientsPage {
   readonly page: Page;
-  readonly addClientButton: Locator;
-  readonly clientList: Locator;
-  readonly clientNameInput: Locator;
+  readonly addButton: Locator;
+  readonly nameInput: Locator;
   readonly saveButton: Locator;
-  readonly editButton: Locator;
-  readonly cancelButton: Locator;
+  readonly clientTable: Locator;
+  readonly searchBar: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.addClientButton = page.getByRole('button', { name: /add client|add new|\+/i }).or(
-      page.locator('[data-testid="add-client"]')
+    this.addButton = page.locator('button.fa-plus-circle').or(
+      page.getByRole('button', { name: /add|\+/i })
     ).first();
-    this.clientList = page.locator('.client-list, table, [class*="client"]').first();
-    this.clientNameInput = page.getByLabel(/client name|name/i).or(
-      page.locator('input[name*="client"], input[placeholder*="client" i]')
+    this.nameInput = page.locator('#name').or(
+      page.locator('input[name*="name"]')
     ).first();
-    this.saveButton = page.getByRole('button', { name: /save|submit/i }).first();
-    this.editButton = page.locator('[data-testid="edit-client"], button[title*="edit" i], .edit-icon').first();
-    this.cancelButton = page.getByRole('button', { name: /cancel/i }).first();
-  }
-
-  async navigateToManageClients(): Promise<void> {
-    await this.page.getByText('Manage Clients', { exact: false }).or(
-      this.page.locator('a[href*="clients"]')
-    ).first().click();
-    await waitForPageLoad(this.page);
+    this.saveButton = page.getByRole('button', { name: /^Save$/i });
+    this.clientTable = page.locator('table').filter({ hasText: 'Client' }).first();
+    this.searchBar = page.locator('#search-bar-0');
   }
 
   async addNewClient(clientName?: string): Promise<string> {
     const name = clientName || generateUniqueName('Client');
-    await this.addClientButton.click();
-    await this.clientNameInput.fill(name);
+    await this.addButton.click();
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.fill(name);
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
+    await this.page.waitForTimeout(1000);
     return name;
   }
 
-  async editClient(clientName: string, newDetails: { name?: string }): Promise<void> {
-    const row = this.page.locator(`tr:has-text("${clientName}"), [class*="row"]:has-text("${clientName}")`).first();
-    await row.locator('[title*="edit" i], .edit-icon, button:has-text("Edit")').first().click();
-    if (newDetails.name) {
-      await this.clientNameInput.clear();
-      await this.clientNameInput.fill(newDetails.name);
-    }
+  async editClient(clientName: string, newName: string): Promise<void> {
+    await searchTable(this.page, clientName);
+    const row = this.clientTable.locator('tbody tr').filter({ hasText: clientName }).first();
+    await row.locator('button.edit').or(row.locator('[title*="edit" i]')).first().click();
+    await expect(this.nameInput).toBeVisible();
+    await this.nameInput.clear();
+    await this.nameInput.fill(newName);
     await this.saveButton.click();
-    await waitForSuccessMessage(this.page);
+    await this.page.waitForTimeout(1000);
+  }
+
+  async clientRows(): Promise<string[][]> {
+    return this.clientTable.locator('tbody tr').evaluateAll((rows) =>
+      rows.map((row) => [...(row as HTMLTableRowElement).cells].map((cell) => cell.textContent?.trim() || ''))
+    );
   }
 
   async verifyClientExists(clientName: string): Promise<void> {
+    await searchTable(this.page, clientName);
     await expect(this.page.getByText(clientName)).toBeVisible();
   }
 }
