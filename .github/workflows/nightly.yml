@@ -1,0 +1,99 @@
+name: Nightly full suite
+
+on:
+  schedule:
+    # 02:30 UTC every day.
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "TestNG suite file to run"
+        type: choice
+        default: src/test/resources/suites/testng.xml
+        options:
+          - src/test/resources/suites/testng.xml
+          - src/test/resources/suites/smoke.xml
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "21"
+  MAVEN_ARGS: "-B -ntp"
+
+jobs:
+  full-suite:
+    name: Full TestNG suite (headless)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4.7.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Set up Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1.7.3
+        with:
+          chrome-version: stable
+          install-chromedriver: true
+
+      # continue-on-error is deliberate and scoped to this single step: the committed
+      # suite includes FaceBookLoginTest, whose body ends in Assert.assertTrue(false, ...)
+      # and which drives against facebook.com (login page markup changes constantly and
+      # the site actively blocks datacenter traffic). A nightly full-suite run is therefore
+      # expected to end in BUILD FAILURE today; the artifacts below are the actual output.
+      # Remove this flag once the demo failure is fixed or the external target is stubbed.
+      - name: Run full suite
+        id: full
+        continue-on-error: true
+        env:
+          WDM_CHROMEDRIVERPATH: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+          SUITE: ${{ inputs.suite || 'src/test/resources/suites/testng.xml' }}
+        run: |
+          mvn ${MAVEN_ARGS} test \
+            -Dsurefire.suiteXmlFiles="${SUITE}" \
+            -Dwebdriver.chrome.driver="${WDM_CHROMEDRIVERPATH}" \
+            -Dwdm.chromeDriverPath="${WDM_CHROMEDRIVERPATH}"
+
+      - name: Upload ExtentReports HTML
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: extent-report-nightly-${{ github.run_id }}
+          path: |
+            ExtentReports/**
+            logfile.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Surefire / TestNG output
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: surefire-testng-output-nightly-${{ github.run_id }}
+          path: |
+            target/surefire-reports/**
+            test-output/**
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summarize outcome
+        if: always()
+        run: |
+          {
+            echo "### Nightly suite result"
+            echo ""
+            echo "- Maven outcome: \`${{ steps.full.outcome }}\`"
+            echo "- Known-failing demo test: \`FaceBookLoginTest#facebookLoginTest\` (asserts false by design)"
+            echo "- Reports uploaded as run artifacts."
+          } >> "${GITHUB_STEP_SUMMARY}"
