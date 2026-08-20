@@ -1,0 +1,195 @@
+name: CD (mocked AWS delivery)
+
+# DEMO PIPELINE. Every AWS identifier below is a placeholder: the account ID,
+# role ARN, ECR registry, ECS cluster/service and S3 bucket do not exist. The
+# pipeline runs in DRY_RUN mode unless BOTH the `dry_run` input is set to false
+# AND the repository variable ENABLE_REAL_AWS_DEPLOY is exactly 'true', so a
+# normal run never authenticates to or mutates real infrastructure.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Mock every AWS call (leave true for the demo)'
+        type: boolean
+        default: true
+      suite:
+        description: 'TestNG suite the deployed runner executes'
+        type: string
+        default: './src/test/resources/suites/testng.xml'
+      browser:
+        description: 'Browser the deployed runner uses'
+        type: choice
+        options: [chrome, firefox]
+        default: chrome
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # --- MOCKED PLACEHOLDERS (not real AWS resources) ---
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: '123456789012'
+  ECR_REGISTRY: 123456789012.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: demo-selenium-testng
+  ECS_CLUSTER: demo-selenium-testng
+  ECS_TASK_DEFINITION: demo-selenium-testng-runner
+  REPORTS_BUCKET: demo-selenium-testng-reports
+  OIDC_ROLE_ARN: arn:aws:iam::123456789012:role/demo-selenium-testng-github-oidc
+  # ----------------------------------------------------
+
+jobs:
+  guard:
+    name: Resolve execution mode
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      dry_run: ${{ steps.mode.outputs.dry_run }}
+    steps:
+      - name: Decide dry run
+        id: mode
+        env:
+          REQUESTED_DRY_RUN: ${{ inputs.dry_run }}
+          ENABLE_REAL_AWS_DEPLOY: ${{ vars.ENABLE_REAL_AWS_DEPLOY }}
+        run: |
+          if [ "$REQUESTED_DRY_RUN" = "false" ] && [ "$ENABLE_REAL_AWS_DEPLOY" = "true" ]; then
+            dry_run=false
+          else
+            dry_run=true
+          fi
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          echo "DRY_RUN=$dry_run (real AWS calls require dry_run=false and repository variable ENABLE_REAL_AWS_DEPLOY=true)" >> "$GITHUB_STEP_SUMMARY"
+
+  build-image:
+    name: Build runner image and push to ECR (mocked)
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write # required for AWS OIDC in a real deployment
+    outputs:
+      image: ${{ steps.tag.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image tag
+        id: tag
+        run: echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build runner image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ steps.tag.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Configure AWS credentials via OIDC (real run only)
+        if: needs.guard.outputs.dry_run == 'false'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }} # MOCKED placeholder role ARN
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Push to Amazon ECR (real run only)
+        if: needs.guard.outputs.dry_run == 'false'
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+          docker push "${{ steps.tag.outputs.image }}"
+
+      - name: Mock ECR push
+        if: needs.guard.outputs.dry_run == 'true'
+        run: |
+          {
+            echo "## Mocked ECR push"
+            echo ''
+            echo 'Image built locally, no registry contacted:'
+            echo '```'
+            echo "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY"
+            echo "docker push ${{ steps.tag.outputs.image }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          docker image inspect "${{ steps.tag.outputs.image }}" --format 'built {{.Id}} ({{.Size}} bytes)'
+
+  run-suite:
+    name: Run suite on ECS (${{ matrix.environment }}, mocked)
+    needs: [guard, build-image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        environment: [staging, production] # production requires reviewer approval
+    environment:
+      name: ${{ matrix.environment }}
+    steps:
+      - name: Configure AWS credentials via OIDC (real run only)
+        if: needs.guard.outputs.dry_run == 'false'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }} # MOCKED placeholder role ARN
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy runner and execute suite (real run only)
+        if: needs.guard.outputs.dry_run == 'false'
+        env:
+          IMAGE: ${{ needs.build-image.outputs.image }}
+          TARGET_ENV: ${{ matrix.environment }}
+        run: |
+          aws ecs run-task \
+            --cluster "$ECS_CLUSTER-$TARGET_ENV" \
+            --task-definition "$ECS_TASK_DEFINITION" \
+            --launch-type FARGATE \
+            --overrides "{\"containerOverrides\":[{\"name\":\"runner\",\"image\":\"$IMAGE\",\"environment\":[{\"name\":\"SUITE_XML_FILE\",\"value\":\"${{ inputs.suite }}\"},{\"name\":\"BROWSER\",\"value\":\"${{ inputs.browser }}\"}]}]}"
+
+      - name: Mock ECS deployment and suite execution
+        if: needs.guard.outputs.dry_run == 'true'
+        env:
+          IMAGE: ${{ needs.build-image.outputs.image }}
+          TARGET_ENV: ${{ matrix.environment }}
+        run: |
+          {
+            echo "## Mocked ECS run - $TARGET_ENV"
+            echo ''
+            echo "Cluster: \`$ECS_CLUSTER-$TARGET_ENV\` (placeholder)"
+            echo "Task definition: \`$ECS_TASK_DEFINITION\` (placeholder)"
+            echo "Image: \`$IMAGE\` (placeholder registry)"
+            echo "Suite: \`${{ inputs.suite }}\` on \`${{ inputs.browser }}\`"
+            echo ''
+            echo '```'
+            echo "aws ecs run-task --cluster $ECS_CLUSTER-$TARGET_ENV --task-definition $ECS_TASK_DEFINITION --launch-type FARGATE"
+            echo "aws ecs wait tasks-stopped --cluster $ECS_CLUSTER-$TARGET_ENV --tasks <task-arn>"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish ExtentReports to S3 (mocked)
+        env:
+          TARGET_ENV: ${{ matrix.environment }}
+        run: |
+          destination="s3://$REPORTS_BUCKET/$TARGET_ENV/${GITHUB_RUN_ID}/"
+          if [ "${{ needs.guard.outputs.dry_run }}" = "false" ]; then
+            aws s3 cp ExtentReports/ "$destination" --recursive
+          else
+            {
+              echo "## Mocked report publication - $TARGET_ENV"
+              echo ''
+              echo '```'
+              echo "aws s3 cp ExtentReports/ $destination --recursive"
+              echo '```'
+              echo "Bucket \`$REPORTS_BUCKET\` is a placeholder and is never contacted."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
