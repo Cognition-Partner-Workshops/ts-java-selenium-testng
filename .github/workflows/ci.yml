@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # The pom targets Java 1.8 bytecode; Selenium 4.25 needs a JDK 11+ toolchain to run.
+  JAVA_VERSION: "21"
+  MAVEN_ARGS: "-B -ntp"
+
+jobs:
+  build:
+    name: Build & static validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4.7.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Compile and package (no tests)
+        run: mvn ${MAVEN_ARGS} verify -DskipTests
+
+      # This repo configures no Checkstyle/Spotless/PMD plugin in pom.xml, so there is
+      # nothing to invoke here beyond the compiler. These two checks are the portable
+      # substitute: dependency/plugin resolution correctness and well-formed suite XML.
+      - name: Validate POM and resolve plugins
+        run: mvn ${MAVEN_ARGS} validate dependency:resolve-plugins -DskipTests
+
+      - name: Validate TestNG suite XML is well formed
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libxml2-utils
+          for suite in src/test/resources/suites/*.xml; do
+            echo "Checking ${suite}"
+            xmllint --noout --nonet "${suite}"
+          done
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: test-harness-jar
+          path: target/*.jar
+          if-no-files-found: warn
+          retention-days: 7
+
+  smoke-tests:
+    name: Headless smoke suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: build
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4.7.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      # Pin the browser + matching driver so WebDriverManager never has to resolve a
+      # driver over the network: CHROMEWEBDRIVER/chromedriver is exported by this action
+      # and picked up through the webdriver.chrome.driver system property below.
+      - name: Set up Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1.7.3
+        with:
+          chrome-version: stable
+          install-chromedriver: true
+
+      - name: Run smoke suite (headless Chrome)
+        env:
+          # WebDriverManager resolution order: an explicit driver path wins, so the run
+          # stays offline-safe even if the chromedriver CDN is unreachable from CI.
+          WDM_CHROMEDRIVERPATH: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+        run: |
+          mvn ${MAVEN_ARGS} test \
+            -Dsurefire.suiteXmlFiles=src/test/resources/suites/smoke.xml \
+            -Dwebdriver.chrome.driver="${WDM_CHROMEDRIVERPATH}" \
+            -Dwdm.chromeDriverPath="${WDM_CHROMEDRIVERPATH}" \
+            -Dwebdriver.chrome.whitelistedIps=
+
+      # Scope note (no continue-on-error anywhere in this job): the committed full suite
+      # (suites/testng.xml) also contains FaceBookLoginTest, which ends in
+      # Assert.assertTrue(false, ...) by design and drives against facebook.com. CI runs
+      # the smoke suite (GoogleSearchTest only) so a red X always means a real regression.
+      # The full suite runs in nightly.yml, where the known failure is expected.
+
+      - name: Upload ExtentReports HTML
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: extent-report-smoke
+          path: |
+            ExtentReports/**
+            logfile.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Surefire / TestNG output
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: surefire-testng-output-smoke
+          path: |
+            target/surefire-reports/**
+            test-output/**
+          if-no-files-found: warn
+          retention-days: 14

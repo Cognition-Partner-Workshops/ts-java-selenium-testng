@@ -1,0 +1,266 @@
+name: CD (mock AWS)
+
+# DEMO PIPELINE. Every AWS identifier below is a documented placeholder (account
+# 123456789012, demo-* names, us-east-1). Nothing authenticates or mutates AWS unless the
+# repository sets vars.AWS_MOCK_MODE to 'false' AND provides a real OIDC role — see the
+# `Guard` steps and docs/CICD.md. Under the default mock configuration every AWS-touching
+# step logs the command it *would* run and exits 0.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        default: staging
+        options: [staging, production]
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # --- Mocked AWS identifiers (override with Actions variables to go real) ---
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID || '123456789012' }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'demo/selenium-testng-harness' }}
+  REPORTS_BUCKET: ${{ vars.REPORTS_BUCKET || 'demo-mock-test-reports' }}
+  # 'true' (default) keeps the pipeline hermetic: build only, no AWS calls.
+  AWS_MOCK_MODE: ${{ vars.AWS_MOCK_MODE || 'true' }}
+
+jobs:
+  build-image:
+    name: Build harness image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Compute image tag
+        id: meta
+        run: echo "image_tag=${GITHUB_SHA::12}" >> "${GITHUB_OUTPUT}"
+
+      - uses: docker/setup-buildx-action@v3.8.0
+
+      # Always builds for real (no AWS involved) and exports a local tarball so the
+      # downstream deploy jobs have something concrete to "push" in mock mode.
+      - name: Build image
+        uses: docker/build-push-action@v6.13.0
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: false
+          outputs: type=docker,dest=/tmp/harness-image.tar
+          tags: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload image tarball
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: harness-image
+          path: /tmp/harness-image.tar
+          retention-days: 3
+
+  deploy-staging:
+    name: Deploy to staging (demo-staging)
+    needs: build-image
+    if: github.event_name == 'push' || inputs.environment == 'staging' || inputs.environment == 'production'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # GitHub Environment 'staging' — add reviewers there if staging should also gate.
+    environment:
+      name: staging
+    permissions:
+      contents: read
+      id-token: write # required for OIDC role assumption (no long-lived keys)
+    env:
+      ENV_NAME: staging
+      K8S_NAMESPACE: demo-staging
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER_STAGING || 'demo-staging-cluster' }}
+      ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY_STAGING || 'demo-staging-selenium-harness' }}
+      ECS_SUBNETS: ${{ vars.ECS_SUBNETS_STAGING || 'subnet-0abc123456789def0' }}
+      ECS_SECURITY_GROUPS: ${{ vars.ECS_SECURITY_GROUPS_STAGING || 'sg-0abc123456789def0' }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN_STAGING || 'arn:aws:iam::123456789012:role/demo-staging-github-oidc' }}
+      TASK_EXECUTION_ROLE_ARN: ${{ vars.TASK_EXECUTION_ROLE_ARN_STAGING || 'arn:aws:iam::123456789012:role/demo-ecsTaskExecutionRole' }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Download image tarball
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: harness-image
+          path: /tmp
+
+      # ---- Guard: everything below no-ops while AWS_MOCK_MODE is 'true' ----
+      - name: Configure AWS credentials (OIDC)
+        if: env.AWS_MOCK_MODE != 'true'
+        uses: aws-actions/configure-aws-credentials@v4.0.2
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-cd-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        if: env.AWS_MOCK_MODE != 'true'
+        uses: aws-actions/amazon-ecr-login@v2.0.1
+
+      - name: Push image to ECR
+        env:
+          IMAGE_URI: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ needs.build-image.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          docker load --input /tmp/harness-image.tar
+          if [ "${AWS_MOCK_MODE}" = "true" ]; then
+            echo "::notice::MOCK MODE — would run: docker push ${IMAGE_URI}"
+            exit 0
+          fi
+          docker push "${IMAGE_URI}"
+
+      - name: Render ECS task definition
+        env:
+          IMAGE_URI: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ needs.build-image.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          sed -e "s|__IMAGE_URI__|${IMAGE_URI}|g" \
+              -e "s|__ENV_NAME__|${ENV_NAME}|g" \
+              -e "s|__TASK_FAMILY__|${ECS_TASK_FAMILY}|g" \
+              -e "s|__EXECUTION_ROLE_ARN__|${TASK_EXECUTION_ROLE_ARN}|g" \
+              -e "s|__AWS_REGION__|${AWS_REGION}|g" \
+              deploy/ecs-task-definition.json > /tmp/task-definition.json
+          cat /tmp/task-definition.json
+
+      - name: Register task definition and run harness task
+        run: |
+          set -euo pipefail
+          NETWORK="awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=ENABLED}"
+          if [ "${AWS_MOCK_MODE}" = "true" ]; then
+            echo "::notice::MOCK MODE — would run: aws ecs register-task-definition --cli-input-json file:///tmp/task-definition.json"
+            echo "::notice::MOCK MODE — would run: aws ecs run-task --cluster ${ECS_CLUSTER} --task-definition ${ECS_TASK_FAMILY} --launch-type FARGATE --network-configuration ${NETWORK}"
+            echo "::notice::MOCK MODE — EKS equivalent: kubectl -n ${K8S_NAMESPACE} create job selenium-harness-${GITHUB_SHA::12} --image=<image>"
+            exit 0
+          fi
+          aws ecs register-task-definition --cli-input-json file:///tmp/task-definition.json
+          aws ecs run-task \
+            --cluster "${ECS_CLUSTER}" \
+            --task-definition "${ECS_TASK_FAMILY}" \
+            --launch-type FARGATE \
+            --network-configuration "${NETWORK}"
+
+      - name: Publish reports to S3
+        run: |
+          set -euo pipefail
+          DEST="s3://${REPORTS_BUCKET}/${ENV_NAME}/${GITHUB_RUN_ID}/"
+          if [ "${AWS_MOCK_MODE}" = "true" ]; then
+            echo "::notice::MOCK MODE — would run: aws s3 sync ExtentReports/ ${DEST}"
+            exit 0
+          fi
+          aws s3 sync ExtentReports/ "${DEST}"
+
+  deploy-production:
+    name: Promote to production (demo-prod)
+    needs: [build-image, deploy-staging]
+    if: github.event_name == 'push' || inputs.environment == 'production'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Manual approval gate: configure required reviewers on the 'production'
+    # GitHub Environment. The job stays queued until an approver releases it.
+    environment:
+      name: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ENV_NAME: production
+      K8S_NAMESPACE: demo-prod
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER_PRODUCTION || 'demo-prod-cluster' }}
+      ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY_PRODUCTION || 'demo-prod-selenium-harness' }}
+      ECS_SUBNETS: ${{ vars.ECS_SUBNETS_PRODUCTION || 'subnet-0fed987654321cba0' }}
+      ECS_SECURITY_GROUPS: ${{ vars.ECS_SECURITY_GROUPS_PRODUCTION || 'sg-0fed987654321cba0' }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN_PRODUCTION || 'arn:aws:iam::123456789012:role/demo-prod-github-oidc' }}
+      TASK_EXECUTION_ROLE_ARN: ${{ vars.TASK_EXECUTION_ROLE_ARN_PRODUCTION || 'arn:aws:iam::123456789012:role/demo-ecsTaskExecutionRole' }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Download image tarball
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: harness-image
+          path: /tmp
+
+      - name: Configure AWS credentials (OIDC)
+        if: env.AWS_MOCK_MODE != 'true'
+        uses: aws-actions/configure-aws-credentials@v4.0.2
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-cd-prod-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        if: env.AWS_MOCK_MODE != 'true'
+        uses: aws-actions/amazon-ecr-login@v2.0.1
+
+      # Promotion re-tags the exact image validated in staging; it is never rebuilt.
+      - name: Promote staging image tag to production
+        env:
+          SRC_URI: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ needs.build-image.outputs.image_tag }}
+          PROD_URI: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:prod-${{ needs.build-image.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          docker load --input /tmp/harness-image.tar
+          docker tag "${SRC_URI}" "${PROD_URI}"
+          if [ "${AWS_MOCK_MODE}" = "true" ]; then
+            echo "::notice::MOCK MODE — would run: docker push ${PROD_URI}"
+            exit 0
+          fi
+          docker push "${PROD_URI}"
+
+      - name: Render ECS task definition
+        env:
+          IMAGE_URI: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:prod-${{ needs.build-image.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          sed -e "s|__IMAGE_URI__|${IMAGE_URI}|g" \
+              -e "s|__ENV_NAME__|${ENV_NAME}|g" \
+              -e "s|__TASK_FAMILY__|${ECS_TASK_FAMILY}|g" \
+              -e "s|__EXECUTION_ROLE_ARN__|${TASK_EXECUTION_ROLE_ARN}|g" \
+              -e "s|__AWS_REGION__|${AWS_REGION}|g" \
+              deploy/ecs-task-definition.json > /tmp/task-definition.json
+          cat /tmp/task-definition.json
+
+      - name: Register task definition and run harness task
+        run: |
+          set -euo pipefail
+          NETWORK="awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=ENABLED}"
+          if [ "${AWS_MOCK_MODE}" = "true" ]; then
+            echo "::notice::MOCK MODE — would run: aws ecs register-task-definition --cli-input-json file:///tmp/task-definition.json"
+            echo "::notice::MOCK MODE — would run: aws ecs run-task --cluster ${ECS_CLUSTER} --task-definition ${ECS_TASK_FAMILY} --launch-type FARGATE --network-configuration ${NETWORK}"
+            echo "::notice::MOCK MODE — EKS equivalent: kubectl -n ${K8S_NAMESPACE} create job selenium-harness-${GITHUB_SHA::12} --image=<image>"
+            exit 0
+          fi
+          aws ecs register-task-definition --cli-input-json file:///tmp/task-definition.json
+          aws ecs run-task \
+            --cluster "${ECS_CLUSTER}" \
+            --task-definition "${ECS_TASK_FAMILY}" \
+            --launch-type FARGATE \
+            --network-configuration "${NETWORK}"
+
+      - name: Publish reports to S3
+        run: |
+          set -euo pipefail
+          DEST="s3://${REPORTS_BUCKET}/${ENV_NAME}/${GITHUB_RUN_ID}/"
+          if [ "${AWS_MOCK_MODE}" = "true" ]; then
+            echo "::notice::MOCK MODE — would run: aws s3 sync ExtentReports/ ${DEST}"
+            exit 0
+          fi
+          aws s3 sync ExtentReports/ "${DEST}"
