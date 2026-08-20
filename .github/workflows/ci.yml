@@ -1,0 +1,243 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Nightly full-suite run at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'TestNG suite file to execute'
+        type: string
+        default: './src/test/resources/suites/testng.xml'
+      browser:
+        description: 'Browser to run the suite against'
+        type: choice
+        options: [chrome, firefox, both]
+        default: chrome
+      thread_count:
+        description: 'TestNG thread-count for parallel class execution'
+        type: string
+        default: '5'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: '17'
+
+jobs:
+  compile:
+    name: Compile check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      # The pom targets Java 1.8 bytecode, but Selenium 4.25 ships Java 11 class
+      # files, so the toolchain itself must be 11+. Temurin 17 is used for the JDK
+      # while maven.compiler.source/target stay at 1.8.
+      - name: Compile main and test sources
+        run: mvn -ntp -B clean test-compile
+
+  matrix-setup:
+    name: Resolve browser matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      browsers: ${{ steps.resolve.outputs.browsers }}
+    steps:
+      - name: Resolve browsers
+        id: resolve
+        env:
+          REQUESTED: ${{ inputs.browser }}
+        run: |
+          case "${REQUESTED:-}" in
+            chrome)  browsers='["chrome"]' ;;
+            firefox) browsers='["firefox"]' ;;
+            *)       browsers='["chrome","firefox"]' ;;
+          esac
+          echo "browsers=$browsers" >> "$GITHUB_STEP_SUMMARY"
+          echo "browsers=$browsers" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: UI suite (${{ matrix.browser }})
+    needs: [compile, matrix-setup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: ${{ fromJSON(needs.matrix-setup.outputs.browsers) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Set up Chrome
+        if: matrix.browser == 'chrome'
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-chromedriver: true
+
+      - name: Set up Firefox
+        if: matrix.browser == 'firefox'
+        uses: browser-actions/setup-firefox@v1
+
+      - name: Set up geckodriver
+        if: matrix.browser == 'firefox'
+        uses: browser-actions/setup-geckodriver@latest
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # BaseTest prefers a driver binary already on the runner (webdriver.*.driver
+      # system property or the CHROMEWEBDRIVER/GECKOWEBDRIVER directories) and only
+      # falls back to WebDriverManager downloads, so the run works without network
+      # access to the driver mirrors.
+      - name: Locate driver binaries
+        id: drivers
+        run: |
+          for candidate in chromedriver geckodriver; do
+            path="$(command -v "$candidate" || true)"
+            [ -n "$path" ] && echo "$candidate=$path" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Prepare suite (thread-count = ${{ inputs.thread_count || 5 }})
+        id: suite
+        env:
+          SUITE: ${{ inputs.suite || './src/test/resources/suites/testng.xml' }}
+          THREADS: ${{ inputs.thread_count || '5' }}
+        run: |
+          mkdir -p target/suites
+          out="target/suites/$(basename "$SUITE")"
+          sed -E "s/thread-count=\"[0-9]+\"/thread-count=\"$THREADS\"/g" "$SUITE" > "$out"
+          echo "file=$out" >> "$GITHUB_OUTPUT"
+
+      # The bundled demo suite drives public websites (google.co.in, facebook.com)
+      # and FaceBookLoginTest asserts false on purpose, so test failures must not
+      # fail the workflow. Results are surfaced in the job summary and artifacts.
+      - name: Run TestNG suite (${{ matrix.browser }}, headless)
+        continue-on-error: true
+        run: |
+          mvn -ntp -B test \
+            -DsuiteXmlFile="${{ steps.suite.outputs.file }}" \
+            -Dbrowser=${{ matrix.browser }} \
+            -Dheadless=true \
+            -Dmaven.test.failure.ignore=true \
+            ${{ steps.drivers.outputs.chromedriver && format('-Dwebdriver.chrome.driver={0}', steps.drivers.outputs.chromedriver) || '' }} \
+            ${{ steps.drivers.outputs.geckodriver && format('-Dwebdriver.gecko.driver={0}', steps.drivers.outputs.geckodriver) || '' }}
+
+      - name: Test summary
+        if: always()
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: python3 .github/scripts/testng_summary.py
+
+      - name: Upload ExtentReports HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extent-report-${{ matrix.browser }}
+          path: |
+            ExtentReports/
+            logfile.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload TestNG and Surefire results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.browser }}
+          path: |
+            target/surefire-reports/
+            test-output/
+          if-no-files-found: warn
+          retention-days: 14
+
+  dependency-scan:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Resolve dependency tree
+        run: mvn -ntp -B dependency:tree -DoutputFile=target/dependency-tree.txt
+
+      - name: Scan dependencies with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '0'
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+        continue-on-error: true
+
+      - name: Upload dependency tree
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-tree
+          path: target/dependency-tree.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      # Requires the repository's Dependency graph to be enabled (Settings >
+      # Code security). Non-blocking so the workflow still passes while it is
+      # off; Trivy remains the gating-capable scanner.
+      - uses: actions/dependency-review-action@v4
+        continue-on-error: true
+        with:
+          fail-on-severity: critical
+          comment-summary-in-pr: on-failure
