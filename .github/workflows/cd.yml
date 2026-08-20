@@ -137,6 +137,8 @@ jobs:
     environment:
       name: ${{ matrix.environment }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Configure AWS credentials via OIDC (real run only)
         if: needs.guard.outputs.dry_run == 'false'
         uses: aws-actions/configure-aws-credentials@v4
@@ -182,6 +184,9 @@ jobs:
         run: |
           destination="s3://$REPORTS_BUCKET/$TARGET_ENV/${GITHUB_RUN_ID}/"
           if [ "${{ needs.guard.outputs.dry_run }}" = "false" ]; then
+            # A real run would pull the reports the ECS task wrote to its own
+            # volume first; the demo has no such volume.
+            mkdir -p ExtentReports
             aws s3 cp ExtentReports/ "$destination" --recursive
           else
             {
