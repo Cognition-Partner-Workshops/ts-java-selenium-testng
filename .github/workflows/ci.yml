@@ -233,7 +233,11 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+      # Requires the repository's Dependency graph to be enabled (Settings >
+      # Code security). Non-blocking so the workflow still passes while it is
+      # off; Trivy remains the gating-capable scanner.
       - uses: actions/dependency-review-action@v4
+        continue-on-error: true
         with:
           fail-on-severity: critical
           comment-summary-in-pr: on-failure
