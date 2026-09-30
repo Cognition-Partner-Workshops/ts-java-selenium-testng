@@ -1,0 +1,46 @@
+# https://docs.devin.ai/onboard-devin/environment-yaml
+# Selenium WebDriver + TestNG Java Maven test framework. No app server; "running" = build compiles and `mvn test` runs the suite headlessly.
+# One-time setup (e.g., install system tools, global CLIs).
+initialize: |
+  sudo apt-get update -y && sudo apt-get install -y maven
+  # Maven Central's default endpoints are rate-limited from snapshot builders.
+  # Keep this mirror repo-specific rather than changing Maven behavior for other repos in the snapshot.
+  install -d "$HOME/.m2"
+  cat > "$HOME/.m2/settings-ts-java-selenium-testng.xml" <<'EOF'
+  <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <mirrors>
+      <mirror>
+        <id>google-maven-central</id>
+        <name>Google Cloud mirror of Maven Central</name>
+        <url>https://maven-central.storage-download.googleapis.com/maven2</url>
+        <mirrorOf>central</mirrorOf>
+      </mirror>
+    </mirrors>
+  </settings>
+  EOF
+  # WebDriverManager auto-downloads chromedriver, but it needs a real Chrome binary at a standard path.
+  # Symlink the preinstalled Chrome-for-Testing (fallback to bundled Chromium) so detection + launch work headlessly.
+  CHROME_BIN="$(ls -1 /opt/.devin/chrome/chrome/linux-*/chrome-linux64/chrome 2>/dev/null | sort -V | tail -1)"
+  [ -z "$CHROME_BIN" ] && CHROME_BIN="$(ls -1 /opt/.devin/playwright_browsers/chromium-*/chrome-linux/chrome "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux/chrome 2>/dev/null | sort -V | tail -1)"
+  sudo ln -sf "$CHROME_BIN" /usr/bin/google-chrome
+  google-chrome --version || true
+# Install project dependencies (runs during builds, surfaced to agent at session start).
+maintenance: |
+  MVN_RETRY_OPTS="-Dmaven.wagon.http.retryHandler.count=3 -Dmaven.wagon.httpconnectionManager.ttlSeconds=120 -Dmaven.wagon.rto=60000"
+  mvn -q -B -s "$HOME/.m2/settings-ts-java-selenium-testng.xml" -DskipTests $MVN_RETRY_OPTS test-compile
+knowledge:
+  - name: lint
+    contents: |
+      No linter configured in this repo.
+  - name: test
+    contents: |
+      mvn test   # runs src/test/resources/suites/testng.xml headlessly via Surefire
+      # googleSearchTest passes; facebookLoginTest is an intentionally-failing demo
+      # (it hardcodes Assert.assertTrue(false,...) and Facebook's #email locator is gone),
+      # so a full `mvn test` ends in BUILD FAILURE by design. Smoke a single class with:
+      # mvn -q test -Dsurefire.suiteXmlFiles=/tmp/smoke.xml  (a suite listing only GoogleSearchTest)
+  - name: build
+    contents: |
+      mvn -DskipTests test-compile   # or `mvn clean test-compile`
